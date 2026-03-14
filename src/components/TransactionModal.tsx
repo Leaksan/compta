@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { Transaction, TransactionType, saveTransaction, updateTransaction, getMonthKey, PREDEFINED_CATEGORIES, getUserSettings } from '../storage';
+import { Transaction, TransactionType, saveTransaction, updateTransaction, getMonthKey, getUserSettings } from '../storage';
 import { format } from 'date-fns';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
 export default function TransactionModal({ isOpen, onClose, onSave, transaction, currentDate }: Props) {
   const [type, setType] = useState<TransactionType>('income');
   const [amount, setAmount] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState('');
   const [observation, setObservation] = useState('');
@@ -26,6 +27,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
     if (transaction) {
       setType(transaction.type);
       setAmount(transaction.amount.toString());
+      setQuantity(transaction.quantity?.toString() || '1');
       setLabel(transaction.label);
       setCategory(transaction.category);
       setObservation(transaction.observation || '');
@@ -34,8 +36,9 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
     } else {
       setType('income');
       setAmount('');
+      setQuantity('1');
       setLabel('');
-      setCategory(PREDEFINED_CATEGORIES.income[0]);
+      setCategory(settings.categories?.income[0] || 'Vente');
       setObservation('');
       setDate(format(currentDate, 'yyyy-MM-dd'));
       setCustomData({});
@@ -44,7 +47,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
 
   useEffect(() => {
     if (!transaction) {
-      setCategory(PREDEFINED_CATEGORIES[type][0]);
+      setCategory(settings.categories?.[type][0] || (type === 'income' ? 'Vente' : 'Loyer'));
     }
   }, [type, transaction]);
 
@@ -56,15 +59,18 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
     const hiddenFields = settings.hiddenFields || [];
     const isAmountRequired = !hiddenFields.includes('income') || !hiddenFields.includes('expense');
     const parsedAmount = parseFloat(amount);
+    const parsedQuantity = parseInt(quantity, 10);
+    const finalQuantity = isNaN(parsedQuantity) || parsedQuantity < 1 ? 1 : parsedQuantity;
 
     if (isAmountRequired && (!amount || isNaN(parsedAmount) || parsedAmount <= 0)) {
-      alert("Veuillez saisir un montant (Entrée ou Dépense).");
+      alert(`Veuillez saisir un montant (${settings.fieldLabels?.income || 'Entrée'} ou ${settings.fieldLabels?.expense || 'Dépense'}).`);
       return;
     }
 
     const transactionData = {
       type,
       amount: isNaN(parsedAmount) ? 0 : parsedAmount,
+      quantity: finalQuantity,
       label,
       category,
       observation,
@@ -81,17 +87,19 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
     onSave();
   };
 
-  const categories = [...PREDEFINED_CATEGORIES[type], 'Autre'];
+  const categories = [...(settings.categories?.[type] || []), 'Autre'];
   const fieldOrder = settings.fieldOrder || ['date', 'category', 'label', 'observation', 'income', 'expense'];
+  // Ensure quantity is in fieldOrder if not present
+  const fullFieldOrder = fieldOrder.includes('quantity') ? fieldOrder : [...fieldOrder.slice(0, fieldOrder.indexOf('income') !== -1 ? fieldOrder.indexOf('income') : fieldOrder.length), 'quantity', ...fieldOrder.slice(fieldOrder.indexOf('income') !== -1 ? fieldOrder.indexOf('income') : fieldOrder.length)];
   const hiddenFields = settings.hiddenFields || [];
-  const visibleFields = fieldOrder.filter(id => !hiddenFields.includes(id));
+  const visibleFields = fullFieldOrder.filter(id => !hiddenFields.includes(id));
 
   const renderField = (fieldId: string) => {
     switch (fieldId) {
       case 'income':
         return (
           <div key="income">
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-success mb-2">Entrée</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-success mb-2">{settings.fieldLabels?.income || 'Entrée'}</label>
             <div className="relative">
               <input
                 type="number"
@@ -114,7 +122,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
       case 'expense':
         return (
           <div key="expense">
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-danger mb-2">Dépense</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-danger mb-2">{settings.fieldLabels?.expense || 'Dépense'}</label>
             <div className="relative">
               <input
                 type="number"
@@ -134,13 +142,27 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
             </div>
           </div>
         );
+      case 'quantity':
+        return (
+          <div key="quantity">
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">{settings.fieldLabels?.quantity || 'Quantité'}</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all"
+              placeholder="1"
+            />
+          </div>
+        );
       case 'label':
         return (
           <div key="label">
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">Libellé</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">{settings.fieldLabels?.label || 'Libellé'} (Optionnel)</label>
             <input
               type="text"
-              required
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all"
@@ -151,7 +173,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
       case 'category':
         return (
           <div key="category">
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">Catégorie</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">{settings.fieldLabels?.category || 'Catégorie'}</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -166,7 +188,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
       case 'date':
         return (
           <div key="date">
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">Date</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">{settings.fieldLabels?.date || 'Date'}</label>
             <input
               type="date"
               required
@@ -179,7 +201,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, transaction,
       case 'observation':
         return (
           <div key="observation">
-            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">Observation (Optionnel)</label>
+            <label className="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">{settings.fieldLabels?.observation || 'Observation'} (Optionnel)</label>
             <textarea
               value={observation}
               onChange={(e) => setObservation(e.target.value)}

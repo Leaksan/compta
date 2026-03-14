@@ -36,14 +36,15 @@ export async function exportToExcel(transactions: Transaction[], periodName: str
     const monthTransactions = groupedByMonth[monthName];
     
     const headers = visibleFields.map(id => {
-      if (id === 'date') return 'Date';
+      if (id === 'date') return settings.fieldLabels?.date || 'Date';
       if (id === 'type') return 'Type';
-      if (id === 'category') return 'Catégorie';
-      if (id === 'label') return 'Libellé';
-      if (id === 'observation') return 'Observation';
+      if (id === 'category') return settings.fieldLabels?.category || 'Catégorie';
+      if (id === 'label') return settings.fieldLabels?.label || 'Libellé';
+      if (id === 'observation') return settings.fieldLabels?.observation || 'Observation';
       if (id === 'amount') return 'Montant';
-      if (id === 'income') return 'Entrée (CA)';
-      if (id === 'expense') return 'Dépense';
+      if (id === 'income') return settings.fieldLabels?.income || 'Entrée (CA)';
+      if (id === 'expense') return settings.fieldLabels?.expense || 'Dépense';
+      if (id === 'quantity') return settings.fieldLabels?.quantity || 'Quantité';
       const cf = customFields.find(f => f.id === id);
       return cf ? cf.name : '';
     });
@@ -51,13 +52,14 @@ export async function exportToExcel(transactions: Transaction[], periodName: str
     const rowData = monthTransactions.map(t => {
       return visibleFields.map(id => {
         if (id === 'date') return format(new Date(t.date), 'dd/MM/yyyy');
-        if (id === 'type') return t.type === 'income' ? 'Entrée' : 'Dépense';
+        if (id === 'type') return t.type === 'income' ? (settings.fieldLabels?.income || 'Entrée') : (settings.fieldLabels?.expense || 'Dépense');
         if (id === 'category') return t.category;
         if (id === 'label') return t.label;
         if (id === 'observation') return t.observation || '';
         if (id === 'amount') return t.amount;
         if (id === 'income') return t.type === 'income' ? t.amount : '';
         if (id === 'expense') return t.type === 'expense' ? t.amount : '';
+        if (id === 'quantity') return t.quantity || 1;
         const cf = customFields.find(f => f.id === id);
         if (cf) return t.customData ? t.customData[cf.id] || '' : '';
         return '';
@@ -134,8 +136,8 @@ export async function exportToExcel(transactions: Transaction[], periodName: str
   const summaryData = [
     { 'Métrique': 'Période', 'Valeur': periodName },
     { 'Métrique': 'Date d\'export', 'Valeur': format(new Date(), 'dd/MM/yyyy HH:mm') },
-    { 'Métrique': 'Chiffre d\'Affaires (Entrées)', 'Valeur': `${totalIncomeAll} ${settings.currency}` },
-    { 'Métrique': 'Total Dépenses', 'Valeur': `${totalExpenseAll} ${settings.currency}` },
+    { 'Métrique': `Chiffre d'Affaires (${settings.fieldLabels?.income || 'Entrées'})`, 'Valeur': `${totalIncomeAll} ${settings.currency}` },
+    { 'Métrique': `Total ${settings.fieldLabels?.expense || 'Dépenses'}`, 'Valeur': `${totalExpenseAll} ${settings.currency}` },
     { 'Métrique': 'Bénéfice Net', 'Valeur': `${netBalanceAll} ${settings.currency}` }
   ];
 

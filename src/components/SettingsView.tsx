@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getUserSettings, updateUserSettings, UserSettings, getUserProfile, saveUserProfile, UserProfile } from '../storage';
-import { Settings, Save, Trash2, AlertTriangle, Crown, User, Edit2, X } from 'lucide-react';
+import { Settings, Save, Trash2, AlertTriangle, Crown, User, Edit2, X, Tags } from 'lucide-react';
+import InstallPWA from './InstallPWA';
+import CategoryManager from './CategoryManager';
 
 interface Props {
   onBack: () => void;
@@ -9,6 +11,16 @@ interface Props {
 export default function SettingsView({ onBack }: Props) {
   const [settings, setSettings] = useState<UserSettings>(getUserSettings());
   const [currency, setCurrency] = useState(settings.currency);
+  const [categories, setCategories] = useState(settings.categories || { income: [], expense: [] });
+  const [fieldLabels, setFieldLabels] = useState(settings.fieldLabels || {
+    date: 'Date',
+    category: 'Catégorie',
+    label: 'Libellé',
+    observation: 'Observation',
+    income: 'Entrée',
+    expense: 'Dépense',
+    quantity: 'Quantité'
+  });
   const [saved, setSaved] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(getUserProfile());
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -25,7 +37,7 @@ export default function SettingsView({ onBack }: Props) {
   }, []);
 
   const handleSave = () => {
-    updateUserSettings({ ...settings, currency });
+    updateUserSettings({ ...settings, currency, categories, fieldLabels });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -42,6 +54,10 @@ export default function SettingsView({ onBack }: Props) {
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfileForm({ ...profileForm, [e.target.name]: e.target.value });
+  };
+
+  const handleLabelChange = (key: string, value: string) => {
+    setFieldLabels({ ...fieldLabels, [key]: value });
   };
 
   const handleReset = () => {
@@ -205,6 +221,51 @@ export default function SettingsView({ onBack }: Props) {
               </select>
             </div>
 
+            {settings.isPro && (
+              <>
+                <div className="pt-4 border-t border-neutral-100">
+                  <h3 className="text-sm font-medium text-neutral-900 mb-4 flex items-center gap-2">
+                    <Tags size={16} className="text-neutral-400" />
+                    Catégories personnalisées
+                  </h3>
+                  <CategoryManager 
+                    categories={categories} 
+                    onChange={setCategories} 
+                    fieldLabels={fieldLabels}
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-neutral-100">
+                  <h3 className="text-sm font-medium text-neutral-900 mb-4 flex items-center gap-2">
+                    <Edit2 size={16} className="text-neutral-400" />
+                    Personnalisation des champs
+                  </h3>
+                  <p className="text-xs text-neutral-500 mb-4">Modifiez les noms des champs standards selon vos besoins.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(fieldLabels).map(([key, value]) => (
+                      <div key={key}>
+                        <label className="block text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-1.5 ml-1">
+                          {key === 'date' ? 'Date' : 
+                           key === 'category' ? 'Catégorie' : 
+                           key === 'label' ? 'Libellé' : 
+                           key === 'observation' ? 'Observation' : 
+                           key === 'income' ? 'Entrée' : 
+                           key === 'expense' ? 'Dépense' : 
+                           key === 'quantity' ? 'Quantité' : key}
+                        </label>
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => handleLabelChange(key, e.target.value)}
+                          className="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-900 transition-all"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
             <button
               onClick={handleSave}
               className="w-full bg-neutral-900 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-800 transition-colors"
@@ -215,6 +276,9 @@ export default function SettingsView({ onBack }: Props) {
             {saved && <p className="text-success text-xs text-center font-medium">Paramètres enregistrés !</p>}
           </div>
         </div>
+
+        {/* Mobile App Install */}
+        <InstallPWA />
 
         {/* Danger Zone */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-danger/20">

@@ -8,6 +8,12 @@ export interface CustomField {
   type: 'text' | 'number';
 }
 
+export interface CustomCategory {
+  id: string;
+  name: string;
+  type: TransactionType;
+}
+
 export interface UserProfile {
   firstName: string;
   companyName: string;
@@ -20,6 +26,7 @@ export interface Transaction {
   id: string;
   type: TransactionType;
   amount: number;
+  quantity?: number;
   label: string;
   category: string;
   observation?: string;
@@ -32,10 +39,15 @@ export interface UserSettings {
   currency: string;
   isPro: boolean;
   activatedAt: string | null;
-  customCategories: string[];
+  categories?: {
+    income: string[];
+    expense: string[];
+  };
+  customCategories: CustomCategory[];
   customFields: CustomField[];
   fieldOrder: string[];
   hiddenFields: string[];
+  fieldLabels?: Record<string, string>;
 }
 
 export interface ExportRecord {
@@ -46,14 +58,29 @@ export interface ExportRecord {
   transactions: Transaction[];
 }
 
+export const PREDEFINED_CATEGORIES = {
+  income: ['Vente', 'Prestation', 'Salaire', 'Remboursement', 'Autre entrée'],
+  expense: ['Loyer', 'Fournitures', 'Transport', 'Salaires versés', 'Communication', 'Fiscalité', 'Autre dépense']
+};
+
 const DEFAULT_SETTINGS: UserSettings = {
   currency: 'FCFA',
   isPro: false,
   activatedAt: null,
+  categories: PREDEFINED_CATEGORIES,
   customCategories: [],
   customFields: [],
-  fieldOrder: ['date', 'category', 'label', 'observation', 'income', 'expense'],
-  hiddenFields: []
+  fieldOrder: ['date', 'category', 'label', 'quantity', 'observation', 'income', 'expense'],
+  hiddenFields: ['quantity'], // Hidden by default to not clutter the UI for users who don't need it
+  fieldLabels: {
+    date: 'Date',
+    category: 'Catégorie',
+    label: 'Libellé',
+    observation: 'Observation',
+    income: 'Entrée',
+    expense: 'Dépense',
+    quantity: 'Quantité'
+  }
 };
 
 // --- Export History ---
@@ -114,11 +141,6 @@ export function registerUser(profile: UserProfile): void {
   localStorage.setItem('user_session', 'active');
 }
 // ---------------------------
-
-export const PREDEFINED_CATEGORIES = {
-  income: ['Vente', 'Prestation', 'Salaire', 'Remboursement', 'Autre entrée'],
-  expense: ['Loyer', 'Fournitures', 'Transport', 'Salaires versés', 'Communication', 'Fiscalité', 'Autre dépense']
-};
 
 export function getMonthKey(date: Date | string): string {
   const d = new Date(date);
@@ -204,19 +226,67 @@ export function deleteTransaction(id: string, monthKey: string): void {
   localStorage.setItem(monthKey, JSON.stringify(filtered));
 }
 
+export function updateTransactionsCategory(oldCategoryName: string, newCategoryName: string): void {
+  const months = getAvailableMonths();
+  months.forEach(monthKey => {
+    const transactions = getTransactions(monthKey);
+    let updated = false;
+    const newTransactions = transactions.map(t => {
+      if (t.category === oldCategoryName) {
+        updated = true;
+        return { ...t, category: newCategoryName };
+      }
+      return t;
+    });
+    if (updated) {
+      localStorage.setItem(monthKey, JSON.stringify(newTransactions));
+    }
+  });
+}
+
 export function getUserSettings(): UserSettings {
   const data = localStorage.getItem('user_settings');
   const settings = data ? { ...DEFAULT_SETTINGS, ...JSON.parse(data) } : DEFAULT_SETTINGS;
   
   // Migration for existing users to add fieldOrder
   if (!settings.fieldOrder || settings.fieldOrder.length === 0) {
-    settings.fieldOrder = ['date', 'category', 'label', 'observation', 'income', 'expense', ...(settings.customFields || []).map((f: CustomField) => f.id)];
+    settings.fieldOrder = ['date', 'category', 'label', 'quantity', 'observation', 'income', 'expense', ...(settings.customFields || []).map((f: CustomField) => f.id)];
   } else {
     // Migrate old fieldOrder containing 'type' and 'amount'
     if (settings.fieldOrder.includes('type') || settings.fieldOrder.includes('amount')) {
       settings.fieldOrder = settings.fieldOrder.filter(id => id !== 'type' && id !== 'amount');
       settings.fieldOrder.push('income', 'expense');
     }
+    
+    // Add quantity if it's missing
+    if (!settings.fieldOrder.includes('quantity')) {
+      const labelIndex = settings.fieldOrder.indexOf('label');
+      if (labelIndex !== -1) {
+        settings.fieldOrder.splice(labelIndex + 1, 0, 'quantity');
+      } else {
+        settings.fieldOrder.push('quantity');
+      }
+      
+      // If we just added it to fieldOrder, let's hide it by default so we don't surprise existing users
+      if (!settings.hiddenFields) {
+        settings.hiddenFields = ['quantity'];
+      } else if (!settings.hiddenFields.includes('quantity')) {
+        settings.hiddenFields.push('quantity');
+      }
+    }
+  }
+
+  // Migration for hiddenFields
+  if (!settings.hiddenFields) {
+    settings.hiddenFields = ['quantity'];
+  }
+
+  // Migration for categories and fieldLabels
+  if (!settings.categories) {
+    settings.categories = PREDEFINED_CATEGORIES;
+  }
+  if (!settings.fieldLabels) {
+    settings.fieldLabels = DEFAULT_SETTINGS.fieldLabels;
   }
   
   return settings;

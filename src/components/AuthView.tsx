@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogIn, UserPlus, Building2, Phone, Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { loginUser, registerUser, getUserProfile } from '../storage';
+import Logo from './Logo';
 
 interface AuthViewProps {
   onLoginSuccess: () => void;
@@ -65,8 +66,11 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
         className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden relative z-10"
       >
         <div className="p-8">
+          <div className="flex justify-center mb-6">
+            <Logo className="w-12 h-12 text-neutral-900" textClassName="text-3xl font-bold text-neutral-900" />
+          </div>
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-neutral-900 mb-2">
+            <h1 className="text-2xl font-bold text-neutral-900 mb-2">
               {isLogin ? 'Bon retour !' : 'Bienvenue'}
             </h1>
             <p className="text-neutral-500 text-sm">

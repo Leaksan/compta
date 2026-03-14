@@ -1,6 +1,6 @@
 {
-  "name": "Ledger - Comptabilité Facile",
-  "short_name": "Ledger",
+  "name": "Kaizō",
+  "short_name": "Kaizō",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",

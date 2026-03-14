@@ -74,12 +74,13 @@ export default function ProView({ onBack }: Props) {
 
   const getFieldInfo = (id: string) => {
     const standard: Record<string, {name: string, type: string}> = {
-      'date': {name: 'Date', type: 'date'},
-      'category': {name: 'Catégorie', type: 'liste'},
-      'label': {name: 'Libellé', type: 'texte'},
-      'observation': {name: 'Observation', type: 'texte long'},
-      'income': {name: 'Entrée', type: 'nombre'},
-      'expense': {name: 'Dépense', type: 'nombre'}
+      'date': {name: settings.fieldLabels?.date || 'Date', type: 'date'},
+      'category': {name: settings.fieldLabels?.category || 'Catégorie', type: 'liste'},
+      'label': {name: settings.fieldLabels?.label || 'Libellé', type: 'texte'},
+      'observation': {name: settings.fieldLabels?.observation || 'Observation', type: 'texte long'},
+      'income': {name: settings.fieldLabels?.income || 'Entrée', type: 'nombre'},
+      'expense': {name: settings.fieldLabels?.expense || 'Dépense', type: 'nombre'},
+      'quantity': {name: settings.fieldLabels?.quantity || 'Quantité', type: 'nombre'}
     };
     if (standard[id]) return { ...standard[id], isStandard: true };
     const custom = settings.customFields?.find(f => f.id === id);

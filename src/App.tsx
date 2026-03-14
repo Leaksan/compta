@@ -11,6 +11,8 @@ import ProView from './components/ProView';
 import SettingsView from './components/SettingsView';
 import PeriodSelectorModal from './components/PeriodSelectorModal';
 import AuthView from './components/AuthView';
+import DashboardChart from './components/DashboardChart';
+import Logo from './components/Logo';
 
 type View = 'dashboard' | 'history' | 'pro' | 'settings';
 
@@ -20,6 +22,7 @@ export default function App() {
   const [periodStart, setPeriodStart] = useState(new Date());
   const [periodEnd, setPeriodEnd] = useState(new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [prevTransactions, setPrevTransactions] = useState<Transaction[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPeriodModalOpen, setIsPeriodModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -40,8 +43,16 @@ export default function App() {
   const loadTransactions = () => {
     if (settings.isPro) {
       setTransactions(getTransactionsForPeriod(periodStart, periodEnd));
+      
+      const diffMonths = (periodEnd.getFullYear() - periodStart.getFullYear()) * 12 + (periodEnd.getMonth() - periodStart.getMonth()) + 1;
+      
+      const prevStart = subMonths(periodStart, diffMonths);
+      const prevEnd = subMonths(periodEnd, diffMonths);
+      
+      setPrevTransactions(getTransactionsForPeriod(prevStart, prevEnd));
     } else {
       setTransactions(getTransactions(getMonthKey(periodStart)));
+      setPrevTransactions(getTransactions(getMonthKey(subMonths(periodStart, 1))));
     }
   };
 
@@ -58,6 +69,158 @@ export default function App() {
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
   const netBalance = totalIncome - totalExpense;
+
+  const prevTotalIncome = prevTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+  const prevTotalExpense = prevTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const prevNetBalance = prevTotalIncome - prevTotalExpense;
+
+  const formatCurrency = (amount: number) => {
+    if (settings.currency === 'FCFA') {
+      return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(amount) + ' FCFA';
+    }
+    try {
+      return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: settings.currency, maximumFractionDigits: 0 }).format(amount);
+    } catch (e) {
+      return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(amount) + ' ' + settings.currency;
+    }
+  };
+
+  const getPerformanceObservation = () => {
+    if (transactions.length === 0 && prevTransactions.length === 0) return null;
+    if (transactions.length === 0) {
+      return {
+        text: `Nouveau mois, nouveau départ ! Ajoutez vos premières transactions pour commencer l'analyse.`,
+        type: 'neutral'
+      };
+    }
+    
+    const today = new Date();
+    const isCurrentMonth = periodStart.getMonth() === today.getMonth() && periodStart.getFullYear() === today.getFullYear();
+    const showBalanceComparison = !isCurrentMonth || today.getDate() > 21;
+
+    const isSameMonth = periodStart.getMonth() === periodEnd.getMonth() && periodStart.getFullYear() === periodEnd.getFullYear();
+    const prevPeriodText = isSameMonth 
+      ? `au mois de ${format(subMonths(periodStart, 1), 'MMMM', { locale: fr })}`
+      : `à la période précédente`;
+
+    const getCategoryTotals = (txs: Transaction[], type: 'income' | 'expense') => {
+      return txs.filter(t => t.type === type).reduce((acc, t) => {
+        acc[t.category] = (acc[t.category] || 0) + t.amount;
+        return acc;
+      }, {} as Record<string, number>);
+    };
+
+    const currentIncomeByCategory = getCategoryTotals(transactions, 'income');
+    const prevIncomeByCategory = getCategoryTotals(prevTransactions, 'income');
+    const currentExpenseByCategory = getCategoryTotals(transactions, 'expense');
+    const prevExpenseByCategory = getCategoryTotals(prevTransactions, 'expense');
+
+    interface Insight {
+      text: string;
+      type: 'positive' | 'negative' | 'neutral';
+      score: number;
+    }
+    const insights: Insight[] = [];
+
+    // 1. Balance Comparison (Only if allowed)
+    if (showBalanceComparison) {
+      if (prevTransactions.length === 0) {
+        if (netBalance > 0) {
+          insights.push({ text: `C'est un excellent mois ! Vous avez réalisé ${formatCurrency(netBalance)} de bénéfice.`, type: 'positive', score: 100 });
+        } else if (netBalance < 0) {
+          insights.push({ text: `Attention, vos dépenses ont dépassé vos revenus de ${formatCurrency(Math.abs(netBalance))}.`, type: 'negative', score: 100 });
+        }
+      } else {
+        const diff = netBalance - prevNetBalance;
+        if (diff > 0) {
+          insights.push({ text: `Bravo ! Votre solde s'est amélioré de ${formatCurrency(diff)} par rapport ${prevPeriodText}.`, type: 'positive', score: 100 });
+        } else if (diff < 0) {
+          insights.push({ text: `Attention, votre solde a baissé de ${formatCurrency(Math.abs(diff))} par rapport ${prevPeriodText}.`, type: 'negative', score: 100 });
+        } else {
+          insights.push({ text: `Votre solde est stable par rapport ${prevPeriodText}.`, type: 'neutral', score: 100 });
+        }
+      }
+    }
+
+    // 2. Category Insights
+    Object.keys(currentIncomeByCategory).forEach(cat => {
+      const current = currentIncomeByCategory[cat];
+      const prev = prevIncomeByCategory[cat] || 0;
+      if (prev > 0 && current > prev) {
+        const growth = current - prev;
+        const percent = (growth / prev) * 100;
+        if (percent > 50) {
+          insights.push({ text: `Excellente nouvelle ! Vos revenus en "${cat}" ont explosé (+${formatCurrency(growth)}). Continuez comme ça !`, type: 'positive', score: 90 + Math.min(percent/100, 9) });
+        } else {
+          insights.push({ text: `Belle progression ! Vos revenus en "${cat}" ont augmenté de ${formatCurrency(growth)} par rapport ${prevPeriodText}.`, type: 'positive', score: 70 + Math.min(percent/100, 9) });
+        }
+      }
+    });
+
+    Object.keys(prevExpenseByCategory).forEach(cat => {
+      const prev = prevExpenseByCategory[cat];
+      const current = currentExpenseByCategory[cat] || 0;
+      if (prev > 0 && current < prev) {
+        const reduction = prev - current;
+        const percent = (reduction / prev) * 100;
+        if (percent > 20 && current > 0) {
+          insights.push({ text: `Super effort ! Vos dépenses en "${cat}" ont baissé de ${formatCurrency(reduction)}. Belle gestion !`, type: 'positive', score: 80 + Math.min(percent/100, 9) });
+        } else if (current === 0) {
+          insights.push({ text: `Parfait ! Vous n'avez fait aucune dépense en "${cat}" pour le moment, contre ${formatCurrency(prev)} ${prevPeriodText}.`, type: 'positive', score: 85 });
+        }
+      }
+    });
+
+    Object.keys(currentExpenseByCategory).forEach(cat => {
+      const current = currentExpenseByCategory[cat];
+      const prev = prevExpenseByCategory[cat] || 0;
+      if (prev > 0 && current > prev) {
+        const spike = current - prev;
+        const percent = (spike / prev) * 100;
+        if (percent > 30) {
+          insights.push({ text: `Attention, vos dépenses en "${cat}" ont fortement augmenté (+${formatCurrency(spike)}). Gardez un œil dessus.`, type: 'negative', score: 75 + Math.min(percent/100, 9) });
+        }
+      }
+    });
+
+    // 3. General Motivation (Fallbacks)
+    if (totalExpense === 0 && totalIncome > 0) {
+      insights.push({ text: `Zéro dépense enregistrée pour le moment, belle épargne en perspective !`, type: 'positive', score: 60 });
+    }
+
+    const topIncome = Object.entries(currentIncomeByCategory).sort((a, b) => b[1] - a[1])[0];
+    if (topIncome) {
+      insights.push({ text: `La catégorie "${topIncome[0]}" est votre meilleure source de revenus ce mois-ci (${formatCurrency(topIncome[1])}).`, type: 'positive', score: 50 });
+    }
+
+    const topExpense = Object.entries(currentExpenseByCategory).sort((a, b) => b[1] - a[1])[0];
+    if (topExpense) {
+      insights.push({ text: `Votre principale dépense ce mois-ci est "${topExpense[0]}" (${formatCurrency(topExpense[1])}).`, type: 'neutral', score: 40 });
+    }
+
+    if (transactions.length > prevTransactions.length && prevTransactions.length > 0) {
+      insights.push({ text: `Vous êtes très actif ce mois-ci (${transactions.length} transactions), super suivi de vos finances !`, type: 'positive', score: 30 });
+    }
+
+    if (insights.length === 0) {
+      return {
+        text: `Commencez à ajouter des transactions pour voir votre analyse de performance.`,
+        type: 'neutral'
+      };
+    }
+
+    insights.sort((a, b) => b.score - a.score);
+    
+    // Rotate among the top insights (within 20 points of the best one)
+    const topScore = insights[0].score;
+    const topInsights = insights.filter(i => i.score >= topScore - 20);
+    const selectedIndex = today.getDate() % topInsights.length;
+    
+    const selectedInsight = topInsights[selectedIndex];
+    return { text: selectedInsight.text, type: selectedInsight.type };
+  };
+
+  const observation = getPerformanceObservation();
 
   const getPeriodName = () => {
     const startStr = format(periodStart, 'MMM yyyy', { locale: fr });
@@ -132,17 +295,6 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  const formatCurrency = (amount: number) => {
-    if (settings.currency === 'FCFA') {
-      return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(amount) + ' FCFA';
-    }
-    try {
-      return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: settings.currency, maximumFractionDigits: 0 }).format(amount);
-    } catch (e) {
-      return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(amount) + ' ' + settings.currency;
-    }
-  };
-
   const getGreeting = () => {
     const hour = new Date().getHours();
     const profile = getUserProfile();
@@ -161,8 +313,9 @@ export default function App() {
     <div className="pb-24">
       {/* Header */}
       <div className="bg-white px-6 pt-12 pb-8 shadow-sm border-b border-neutral-100">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-neutral-900">{getGreeting()} 👋</h2>
+        <div className="flex items-center justify-between mb-6">
+          <Logo className="w-8 h-8 text-neutral-900" textClassName="text-xl font-bold text-neutral-900" />
+          <h2 className="text-sm font-medium text-neutral-500">{getGreeting()} 👋</h2>
         </div>
         
         <div className="flex justify-between items-center mb-8">
@@ -194,17 +347,41 @@ export default function App() {
           <div className="flex-1 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
             <div className="flex items-center gap-2 text-neutral-500 mb-2">
               <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest">Entrées</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest">{settings.fieldLabels?.income || 'Entrées'}</span>
             </div>
             <p className="font-mono text-lg font-medium text-neutral-900">{formatCurrency(totalIncome)}</p>
           </div>
           <div className="flex-1 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
             <div className="flex items-center gap-2 text-neutral-500 mb-2">
               <div className="w-1.5 h-1.5 rounded-full bg-danger"></div>
-              <span className="text-[10px] font-semibold uppercase tracking-widest">Dépenses</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest">{settings.fieldLabels?.expense || 'Dépenses'}</span>
             </div>
             <p className="font-mono text-lg font-medium text-neutral-900">{formatCurrency(totalExpense)}</p>
           </div>
+        </div>
+
+        {/* Animated Chart */}
+        <div className="mt-8">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4">Performances</h3>
+          
+          {observation && (
+            <div className={`border rounded-xl p-4 mb-4 flex items-start gap-3 ${
+              observation.type === 'positive' ? 'bg-success-light border-success/20 text-success' :
+              observation.type === 'negative' ? 'bg-danger-light border-danger/20 text-danger' :
+              'bg-neutral-50 border-neutral-100 text-neutral-700'
+            }`}>
+              <div className="mt-0.5">
+                {observation.type === 'positive' ? <TrendingUp size={18} /> :
+                 observation.type === 'negative' ? <TrendingDown size={18} /> :
+                 <TrendingUp size={18} className="opacity-50" />}
+              </div>
+              <p className="text-sm leading-relaxed font-medium">
+                {observation.text}
+              </p>
+            </div>
+          )}
+
+          <DashboardChart transactions={transactions} currency={settings.currency} fieldLabels={settings.fieldLabels} />
         </div>
       </div>
 
@@ -272,7 +449,12 @@ export default function App() {
                     {t.type === 'income' ? <TrendingUp size={18} strokeWidth={2} /> : <TrendingDown size={18} strokeWidth={2} />}
                   </div>
                   <div>
-                    <p className="font-medium text-neutral-900 text-sm">{t.label}</p>
+                    <p className="font-medium text-neutral-900 text-sm">
+                      {t.label || t.category}
+                      {t.quantity && t.quantity > 1 && (
+                        <span className="text-neutral-400 text-xs ml-1.5 font-normal">x{t.quantity}</span>
+                      )}
+                    </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">{t.category}</span>
                       <span className="w-1 h-1 rounded-full bg-neutral-300"></span>
