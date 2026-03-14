@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Share, Plus } from 'lucide-react';
+import { Smartphone, Download, ExternalLink, CheckCircle } from 'lucide-react';
 
-type Platform = 'android' | 'ios' | 'other';
+function isAndroid(): boolean {
+  return /android/i.test(navigator.userAgent);
+}
 
-function detectPlatform(): Platform {
-  const ua = navigator.userAgent.toLowerCase();
-  if (/iphone|ipad|ipod/.test(ua)) return 'ios';
-  if (/android/.test(ua)) return 'android';
-  return 'other';
+function isIOS(): boolean {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 function isInStandaloneMode(): boolean {
@@ -19,111 +18,150 @@ function isInStandaloneMode(): boolean {
 
 export default function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isInstallable, setIsInstallable] = useState(false);
-  const [platform] = useState<Platform>(detectPlatform);
-  const [alreadyInstalled, setAlreadyInstalled] = useState(false);
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [justInstalled, setJustInstalled] = useState(false);
 
   useEffect(() => {
-    // Si déjà installée en standalone, on l'indique
     if (isInStandaloneMode()) {
-      setAlreadyInstalled(true);
+      setInstalled(true);
       return;
     }
 
-    // Android / Chrome Desktop : écoute l'event natif
-    const handleBeforeInstallPrompt = (e: Event) => {
+    const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsInstallable(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
+    window.addEventListener('beforeinstallprompt', handler);
+
+    window.addEventListener('appinstalled', () => {
+      setInstalled(true);
+      setJustInstalled(true);
+      setDeferredPrompt(null);
+    });
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const handleInstallClick = async () => {
-    if (platform === 'ios') {
-      setShowIOSGuide(true);
-      return;
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setInstalled(true);
+      setJustInstalled(true);
     }
-
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setIsInstallable(false);
-        setAlreadyInstalled(true);
-      }
-      setDeferredPrompt(null);
-    } else {
-      // Android sans prompt (cas rare : déjà installé ou navigateur non-Chrome)
-      alert("Ouvrez le menu de votre navigateur (⋮) puis sélectionnez « Ajouter à l'écran d'accueil ».");
-    }
+    setDeferredPrompt(null);
   };
 
-  if (alreadyInstalled) {
+  // Déjà installée
+  if (installed) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
-        <div className="flex items-center gap-3 text-green-600">
-          <Smartphone size={20} />
-          <span className="text-sm font-medium">Application installée</span>
+        <div className="flex items-center gap-3">
+          <CheckCircle size={20} className="text-emerald-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-neutral-900">
+              {justInstalled ? 'Installation réussie !' : 'Application installée'}
+            </p>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Kaizō est disponible sur votre écran d'accueil.
+            </p>
+          </div>
         </div>
-        <p className="text-xs text-neutral-400 mt-2">Kaizō est disponible sur votre écran d'accueil.</p>
       </div>
     );
   }
 
+  // Android avec prompt dispo → bouton direct
+  if (isAndroid() && deferredPrompt) {
+    return (
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
+          <Smartphone size={16} />
+          Application mobile
+        </h2>
+        <p className="text-sm text-neutral-500 mb-5 leading-relaxed">
+          Installez Kaizō sur votre écran d'accueil pour y accéder en un tap, même sans connexion.
+        </p>
+        <button
+          onClick={handleInstall}
+          className="w-full bg-neutral-900 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all"
+        >
+          <Download size={18} />
+          Installer l'application
+        </button>
+      </div>
+    );
+  }
+
+  // Android sans prompt (déjà installé, ou navigateur qui ne supporte pas)
+  if (isAndroid() && !deferredPrompt) {
+    return (
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
+          <Smartphone size={16} />
+          Application mobile
+        </h2>
+        <p className="text-sm text-neutral-500 mb-5 leading-relaxed">
+          Pour installer, ouvrez le menu Chrome <span className="font-mono text-neutral-700">⋮</span> puis appuyez sur <strong className="text-neutral-700">« Ajouter à l'écran d'accueil »</strong>.
+        </p>
+        <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-100">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-widest mb-3">Obtenir l'APK Android</p>
+          <p className="text-xs text-neutral-500 leading-relaxed mb-4">
+            Vous pouvez convertir cette PWA en APK via PWABuilder — un outil gratuit de Microsoft.
+          </p>
+          <a
+            href="https://www.pwabuilder.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-white border border-neutral-200 text-neutral-700 font-medium py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-50 active:scale-95 transition-all text-sm"
+          >
+            <ExternalLink size={15} />
+            Ouvrir PWABuilder
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // iOS
+  if (isIOS()) {
+    return (
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
+          <Smartphone size={16} />
+          Application mobile
+        </h2>
+        <ol className="space-y-3 text-sm text-neutral-600">
+          {[
+            'Ouvrez cette page dans Safari',
+            'Appuyez sur l\'icône Partager (bas de l\'écran)',
+            'Sélectionnez « Sur l\'écran d\'accueil »',
+            'Appuyez sur Ajouter',
+          ].map((step, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span className="w-5 h-5 rounded-full bg-neutral-100 text-neutral-500 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
+  // Desktop ou autre
   return (
     <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
       <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
         <Smartphone size={16} />
-        Installer l'application
+        Application mobile
       </h2>
-
-      {/* Guide iOS */}
-      {showIOSGuide && platform === 'ios' && (
-        <div className="mb-5 bg-blue-50 rounded-2xl p-4 text-sm text-blue-800 space-y-3">
-          <p className="font-medium">Installation sur iPhone / iPad :</p>
-          <ol className="space-y-2 list-none">
-            <li className="flex items-start gap-2">
-              <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
-              <span>Appuyez sur l'icône <Share size={14} className="inline mb-0.5" /> <strong>Partager</strong> en bas de Safari</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
-              <span>Faites défiler et appuyez sur <strong>« Sur l'écran d'accueil »</strong> <Plus size={14} className="inline mb-0.5" /></span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="bg-blue-200 text-blue-900 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
-              <span>Appuyez sur <strong>Ajouter</strong> en haut à droite</span>
-            </li>
-          </ol>
-          <p className="text-xs text-blue-600 mt-1">L'app doit être ouverte dans <strong>Safari</strong> (pas Chrome ni Firefox) pour fonctionner.</p>
-        </div>
-      )}
-
-      <p className="text-sm text-neutral-500 mb-5 leading-relaxed">
-        {platform === 'ios'
-          ? "Installez Kaizō sur votre iPhone pour y accéder depuis l'écran d'accueil, même hors connexion."
-          : "Installez Kaizō sur votre appareil pour y accéder depuis l'écran d'accueil, même hors ligne."
-        }
+      <p className="text-sm text-neutral-500 leading-relaxed">
+        Ouvrez cette application sur votre téléphone Android avec Chrome pour l'installer sur l'écran d'accueil.
       </p>
-
-      <button
-        onClick={handleInstallClick}
-        className="w-full bg-neutral-900 text-white font-semibold py-3.5 rounded-xl flex items-center justify-center gap-2 hover:bg-neutral-800 active:scale-95 transition-all"
-      >
-        <Smartphone size={18} strokeWidth={2} />
-        {platform === 'ios'
-          ? "Comment installer sur iPhone"
-          : isInstallable
-            ? "Installer l'application"
-            : "Comment installer (Android)"
-        }
-      </button>
     </div>
   );
 }
