@@ -28,3 +28,12 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+/* Supprime les carrés noirs de sélection sur le graphique (mobile) */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none;
+  user-select: none;
+  outline: none;
+}

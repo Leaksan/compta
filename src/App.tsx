@@ -13,6 +13,7 @@ import PeriodSelectorModal from './components/PeriodSelectorModal';
 import AuthView from './components/AuthView';
 import DashboardChart from './components/DashboardChart';
 import Logo from './components/Logo';
+import InstallPopup from './components/InstallPopup';
 
 type View = 'dashboard' | 'history' | 'pro' | 'settings';
 
@@ -578,6 +579,9 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Install popup Android */}
+      <InstallPopup />
     </div>
   );
 }
