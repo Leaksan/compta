@@ -39,6 +39,8 @@ export interface UserSettings {
   currency: string;
   isPro: boolean;
   activatedAt: string | null;
+  proExpiresAt?: string | null;
+  proplan?: string | null;
   categories?: {
     income: string[];
     expense: string[];
