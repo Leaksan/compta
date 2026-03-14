@@ -109,11 +109,15 @@ export default function App() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: settings.currency,
-      maximumFractionDigits: 0
-    }).format(amount);
+    try {
+      return new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: settings.currency === 'FCFA' ? 'XAF' : settings.currency,
+        maximumFractionDigits: 0
+      }).format(amount).replace('XAF', 'FCFA').replace('XOF', 'FCFA');
+    } catch (e) {
+      return `${amount} ${settings.currency}`;
+    }
   };
 
   const totals = transactions.reduce((acc, t) => {
