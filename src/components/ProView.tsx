@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  Crown, CheckCircle2, ArrowRight, Star, ListPlus, Plus, Trash2,
-  ArrowUp, ArrowDown, Eye, EyeOff, Loader2, RefreshCw, MessageCircle,
+  Crown, CheckCircle2, ListPlus, Plus, Trash2,
+  ArrowUp, ArrowDown, Eye, EyeOff, MessageCircle,
   CalendarClock, ShieldCheck, Zap
 } from 'lucide-react';
-import { isProUser, checkProStatusFromAPI, applyProLocally, revokePro } from '../monetization';
+import { isProUser } from '../monetization';
 import { getUserSettings, updateUserSettings, UserSettings, CustomField, getUserProfile } from '../storage';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -52,11 +52,6 @@ export default function ProView({ onBack }: Props) {
   const [settings, setSettings] = useState<UserSettings>(getUserSettings());
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text' | 'number'>('text');
-
-  // Vérification API
-  const [verifying, setVerifying] = useState(false);
-  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'success' | 'error' | 'not_found'>('idle');
-  const [verifyMsg, setVerifyMsg] = useState('');
   const [proInfo, setProInfo] = useState<{ plan?: string; expiresAt?: string } | null>(null);
 
   const profile = getUserProfile();
@@ -69,36 +64,6 @@ export default function ProView({ onBack }: Props) {
     }
   }, [isPro]);
 
-  // Vérifie l'abonnement via l'API Neon
-  const handleVerify = async () => {
-    setVerifying(true);
-    setVerifyStatus('idle');
-    setVerifyMsg('');
-    const result = await checkProStatusFromAPI();
-    setVerifying(false);
-    if (result.isPro && result.plan && result.expiresAt) {
-      applyProLocally(result.plan, result.expiresAt);
-      setIsPro(true);
-      setProInfo({ plan: result.plan, expiresAt: result.expiresAt });
-      setSettings(getUserSettings());
-      setVerifyStatus('success');
-      setVerifyMsg(`Accès ${result.plan} activé !`);
-    } else if (result.error) {
-      setVerifyStatus('error');
-      setVerifyMsg('Impossible de joindre le serveur. Réessayez dans quelques instants.');
-    } else {
-      setVerifyStatus('not_found');
-      setVerifyMsg('Aucun abonnement actif trouvé pour ce numéro. Contactez-nous sur WhatsApp après votre paiement.');
-    }
-  };
-
-  const handleRevoke = () => {
-    revokePro();
-    setIsPro(false);
-    setProInfo(null);
-    setVerifyStatus('idle');
-  };
-
   const formatExpiry = (iso?: string) => {
     if (!iso) return '';
     return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -106,7 +71,7 @@ export default function ProView({ onBack }: Props) {
 
   const openWA = (plan: string) => {
     const msg = encodeURIComponent(
-      `Bonjour, je souhaite souscrire au plan ${plan} de l'application. Numéro : ${profile?.whatsapp || ''}. Merci !`
+      `Bonjour, je souhaite souscrire au plan ${plan}. Entreprise : ${profile?.companyName || ''}. Merci !`
     );
     window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
   };
@@ -227,6 +192,7 @@ export default function ProView({ onBack }: Props) {
                 <input
                   type="text" value={newFieldName}
                   onChange={e => setNewFieldName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddField()}
                   placeholder="Nom du champ (ex: Client)"
                   className="flex-1 bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-neutral-900 transition-colors"
                 />
@@ -239,19 +205,6 @@ export default function ProView({ onBack }: Props) {
                   <Plus size={18} /> Valider
                 </button>
               </div>
-            </div>
-
-            {/* Bouton re-vérifier + révoquer */}
-            <div className="bg-white p-5 rounded-2xl border border-neutral-100 shadow-sm space-y-3">
-              <button onClick={handleVerify} disabled={verifying}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-neutral-200 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50">
-                {verifying ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                Re-vérifier mon abonnement
-              </button>
-              <button onClick={handleRevoke}
-                className="w-full text-xs text-neutral-400 hover:text-danger transition-colors py-1">
-                Déconnecter l'accès Pro
-              </button>
             </div>
           </>
         ) : (
@@ -300,7 +253,7 @@ export default function ProView({ onBack }: Props) {
               ))}
             </div>
 
-            {/* Fonctionnalités */}
+            {/* Fonctionnalités incluses */}
             <div className="bg-neutral-900 text-white rounded-2xl p-5 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4">Inclus dans tous les plans</p>
               {[
@@ -316,62 +269,20 @@ export default function ProView({ onBack }: Props) {
               ))}
             </div>
 
-            {/* Process de paiement */}
+            {/* Comment ça marche */}
             <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4">Comment ça marche</p>
               {[
                 'Choisissez un plan et cliquez sur "Souscrire via WhatsApp"',
                 'Envoyez votre paiement mobile money',
-                'Partagez votre preuve de paiement sur WhatsApp',
-                'Votre accès est activé sous 24h',
+                'Partagez votre preuve de paiement sur WhatsApp au 074 74 67 68',
+                'Votre accès Pro est activé sous 24h',
               ].map((step, i) => (
                 <div key={i} className="flex items-start gap-3 mb-3 last:mb-0">
                   <div className="w-6 h-6 rounded-full bg-neutral-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</div>
                   <p className="text-sm text-neutral-600">{step}</p>
                 </div>
               ))}
-            </div>
-
-            {/* ─── VÉRIFICATION ABONNEMENT ─── */}
-            <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-5">
-              <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-1">Déjà abonné ?</p>
-              <p className="text-sm text-neutral-500 mb-4">
-                Si votre paiement a été validé, appuyez sur le bouton ci-dessous pour activer votre accès Pro.
-                {profile?.whatsapp && (
-                  <span className="block mt-1 text-xs text-neutral-400">Numéro détecté : {profile.whatsapp}</span>
-                )}
-              </p>
-              <button
-                onClick={handleVerify}
-                disabled={verifying}
-                className="w-full bg-neutral-900 text-white py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:bg-neutral-800 transition-colors active:scale-95 disabled:opacity-60"
-              >
-                {verifying ? (
-                  <><Loader2 size={18} className="animate-spin" /> Vérification en cours…</>
-                ) : (
-                  <><ShieldCheck size={18} /> Vérifier et activer mon accès Pro</>
-                )}
-              </button>
-
-              {verifyStatus === 'success' && (
-                <div className="mt-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                  <CheckCircle2 size={16} className="shrink-0" /> {verifyMsg}
-                </div>
-              )}
-              {verifyStatus === 'not_found' && (
-                <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                  <p className="font-semibold mb-1">Abonnement non trouvé</p>
-                  <p className="text-xs leading-relaxed">{verifyMsg}</p>
-                  <button onClick={() => openWA('Pro')} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-800 hover:underline">
-                    <MessageCircle size={13} /> Contacter le support WhatsApp
-                  </button>
-                </div>
-              )}
-              {verifyStatus === 'error' && (
-                <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                  {verifyMsg}
-                </div>
-              )}
             </div>
           </>
         )}
