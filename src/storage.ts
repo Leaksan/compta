@@ -64,7 +64,7 @@ export const PREDEFINED_CATEGORIES = {
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
-  currency: 'FCFA',
+  currency: 'XAF',
   isPro: false,
   activatedAt: null,
   categories: PREDEFINED_CATEGORIES,
