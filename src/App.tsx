@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, History, Settings, Crown, Download, Upload, TrendingUp, TrendingDown, FileText, Trash2, Edit2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Plus, History, Settings, Crown, Download, Upload, TrendingUp, TrendingDown, FileText, Trash2, Edit2, ChevronLeft, ChevronRight, Calendar, Share2, MessageCircle } from 'lucide-react';
 import { format, parseISO, subMonths, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Transaction, getTransactions, getTransactionsForPeriod, getMonthKey, deleteTransaction, getUserSettings, isUserLoggedIn, getUserProfile } from './storage';
@@ -312,9 +312,9 @@ export default function App() {
 
   const renderDashboard = () => (
     <div className="pb-24">
-      {/* Header */}
-      <div className="bg-white px-6 pt-12 pb-8 shadow-sm border-b border-neutral-100">
-        <div className="flex items-center justify-between mb-6">
+      {/* Header - hidden on PC since sidebar provides navigation */}
+      <div className="bg-white px-6 pt-12 md:pt-8 pb-8 shadow-sm border-b border-neutral-100">
+        <div className="md:hidden flex items-center justify-between mb-6">
           <Logo className="w-8 h-8 text-neutral-900" textClassName="text-xl font-bold text-neutral-900" />
           <h2 className="text-sm font-medium text-neutral-500">{getGreeting()} 👋</h2>
         </div>
@@ -483,78 +483,189 @@ export default function App() {
       {/* FAB */}
       <button 
         onClick={openNewTransaction}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-neutral-900 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-neutral-800 transition-transform active:scale-95 z-30"
+        className="fixed bottom-24 right-6 md:bottom-8 md:right-8 w-14 h-14 bg-neutral-900 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-neutral-800 transition-transform active:scale-95 z-30"
       >
         <Plus size={24} strokeWidth={2} />
       </button>
     </div>
   );
 
+
+  // ─── WhatsApp share ──────────────────────────────────────────────────────────
+  const handleShare = () => {
+    const appUrl = window.location.origin;
+    const message = `🧾 *ComptaApp* — L'application de comptabilité simple pour les entrepreneurs africains !\n\n✅ Suivi des entrées & dépenses\n✅ Export Excel\n✅ Fonctionne hors ligne\n\n👉 Essayez gratuitement : ${appUrl}`;
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+  };
+
+  const navItems = [
+    { id: 'dashboard' as View, icon: FileText, label: 'Mois' },
+    { id: 'history' as View, icon: History, label: 'Historique' },
+    { id: 'pro' as View, icon: Crown, label: 'PRO' },
+    { id: 'settings' as View, icon: Settings, label: 'Paramètres' },
+  ];
+
   return (
-    <div className="min-h-screen bg-neutral-100 max-w-md mx-auto relative shadow-2xl overflow-hidden flex flex-col">
-      <div className="flex-1 overflow-y-auto">
-        {currentView === 'dashboard' && renderDashboard()}
-        {currentView === 'history' && <HistoryView onSelectMonth={(d) => { setPeriodStart(d); setPeriodEnd(d); setCurrentView('dashboard'); }} />}
-        {currentView === 'pro' && <ProView onBack={() => setCurrentView('dashboard')} />}
-        {currentView === 'settings' && <SettingsView onBack={() => setCurrentView('dashboard')} />}
+    <>
+      {/* ── PC LAYOUT ─────────────────────────────────────────────────────── */}
+      <div className="hidden md:flex min-h-screen bg-neutral-200">
+        {/* Sidebar */}
+        <aside className="w-64 bg-neutral-900 text-white flex flex-col fixed h-full z-10 shadow-2xl">
+          {/* Logo */}
+          <div className="px-6 py-7 border-b border-white/10">
+            <Logo className="w-8 h-8 text-white" textClassName="text-xl font-bold text-white" />
+          </div>
+
+          {/* Nav */}
+          <nav className="flex-1 px-3 py-4 space-y-1">
+            {navItems.map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                onClick={() => setCurrentView(id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  currentView === id
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Icon size={18} strokeWidth={currentView === id ? 2.5 : 1.5} />
+                {label}
+                {id === 'pro' && getUserSettings().isPro && (
+                  <span className="ml-auto text-[9px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase tracking-widest">
+                    Actif
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {/* WhatsApp Share */}
+          <div className="px-3 pb-3">
+            <button
+              onClick={handleShare}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-[#25D366]/20 transition-all group"
+            >
+              <MessageCircle size={18} strokeWidth={1.5} className="group-hover:text-[#25D366] transition-colors" />
+              Partager l'app
+            </button>
+          </div>
+
+          {/* User info */}
+          <div className="px-4 py-5 border-t border-white/10">
+            {getUserProfile() && (
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0">
+                  {getUserProfile()?.firstName?.[0]?.toUpperCase() || '?'}
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-sm font-semibold text-white truncate">{getUserProfile()?.firstName}</p>
+                  <p className="text-xs text-white/40 truncate">{getUserProfile()?.companyName}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <main className="ml-64 flex-1 flex items-start justify-center py-8 px-8 min-h-screen">
+          <div className="w-full max-w-2xl">
+            {/* PC top bar */}
+            <div className="md:hidden flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-neutral-900 capitalize">
+                  {currentView === 'dashboard' ? 'Tableau de bord' :
+                   currentView === 'history' ? 'Historique' :
+                   currentView === 'pro' ? 'Espace PRO' : 'Paramètres'}
+                </h2>
+                <p className="text-sm text-neutral-500 mt-0.5">
+                  {format(periodStart, 'MMMM yyyy', { locale: fr })}
+                </p>
+              </div>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm shadow-green-900/20 active:scale-95"
+              >
+                <Share2 size={16} />
+                Partager
+              </button>
+            </div>
+
+            {/* Content panel */}
+            <div className="bg-white rounded-3xl shadow-sm overflow-hidden border border-neutral-200 min-h-[600px]">
+              {currentView === 'dashboard' && renderDashboard()}
+              {currentView === 'history' && <HistoryView onSelectMonth={(d) => { setPeriodStart(d); setPeriodEnd(d); setCurrentView('dashboard'); }} />}
+              {currentView === 'pro' && <ProView onBack={() => setCurrentView('dashboard')} />}
+              {currentView === 'settings' && <SettingsView onBack={() => setCurrentView('dashboard')} />}
+            </div>
+          </div>
+        </main>
       </div>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 w-full max-w-md bg-white/90 backdrop-blur-md border-t border-neutral-100 px-6 py-4 flex justify-between items-center z-40 pb-safe">
-        <button onClick={() => setCurrentView('dashboard')} className={`flex flex-col items-center gap-1.5 transition-colors ${currentView === 'dashboard' ? 'text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}>
-          <FileText size={20} strokeWidth={currentView === 'dashboard' ? 2.5 : 1.5} />
-          <span className="text-[9px] font-semibold uppercase tracking-widest">Mois</span>
+      {/* ── MOBILE LAYOUT ─────────────────────────────────────────────────── */}
+      <div className="md:hidden min-h-screen bg-neutral-100 relative">
+        {/* WhatsApp share floating button */}
+        <button
+          onClick={handleShare}
+          title="Partager l'application"
+          className="fixed bottom-24 left-4 w-11 h-11 bg-[#25D366] text-white rounded-2xl shadow-lg flex items-center justify-center hover:bg-[#1ebe5d] transition-all active:scale-95 z-30"
+        >
+          <Share2 size={19} />
         </button>
-        <button onClick={() => setCurrentView('history')} className={`flex flex-col items-center gap-1.5 transition-colors ${currentView === 'history' ? 'text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}>
-          <History size={20} strokeWidth={currentView === 'history' ? 2.5 : 1.5} />
-          <span className="text-[9px] font-semibold uppercase tracking-widest">Histo</span>
-        </button>
-        <button onClick={() => setCurrentView('pro')} className={`flex flex-col items-center gap-1.5 transition-colors ${currentView === 'pro' ? 'text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}>
-          <Crown size={20} strokeWidth={currentView === 'pro' ? 2.5 : 1.5} />
-          <span className="text-[9px] font-semibold uppercase tracking-widest">Pro</span>
-        </button>
-        <button onClick={() => setCurrentView('settings')} className={`flex flex-col items-center gap-1.5 transition-colors ${currentView === 'settings' ? 'text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}>
-          <Settings size={20} strokeWidth={currentView === 'settings' ? 2.5 : 1.5} />
-          <span className="text-[9px] font-semibold uppercase tracking-widest">Param</span>
-        </button>
-      </nav>
 
-      <TransactionModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        <div className="flex-1 overflow-y-auto pb-20">
+          {currentView === 'dashboard' && renderDashboard()}
+          {currentView === 'history' && <HistoryView onSelectMonth={(d) => { setPeriodStart(d); setPeriodEnd(d); setCurrentView('dashboard'); }} />}
+          {currentView === 'pro' && <ProView onBack={() => setCurrentView('dashboard')} />}
+          {currentView === 'settings' && <SettingsView onBack={() => setCurrentView('dashboard')} />}
+        </div>
+
+        {/* Bottom Navigation */}
+        <nav className="fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-neutral-100 px-6 py-4 flex justify-between items-center z-40">
+          {navItems.map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => setCurrentView(id)}
+              className={`flex flex-col items-center gap-1.5 transition-colors ${
+                currentView === id ? 'text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'
+              }`}
+            >
+              <Icon size={20} strokeWidth={currentView === id ? 2.5 : 1.5} />
+              <span className="text-[9px] font-semibold uppercase tracking-widest">
+                {id === 'history' ? 'Histo' : id === 'settings' ? 'Param' : label}
+              </span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* ── MODALS (shared) ────────────────────────────────────────────────── */}
+      <TransactionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onSave={() => { setIsModalOpen(false); loadTransactions(); }}
         transaction={editingTransaction}
         currentDate={periodStart}
       />
-      
+
       <PeriodSelectorModal
         isOpen={isPeriodModalOpen}
         onClose={() => setIsPeriodModalOpen(false)}
-        onApply={(start, end) => {
-          setPeriodStart(start);
-          setPeriodEnd(end);
-        }}
+        onApply={(start, end) => { setPeriodStart(start); setPeriodEnd(end); }}
         currentStart={periodStart}
         currentEnd={periodEnd}
       />
 
-      {/* Custom Confirm Modal */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">{confirmModal.title}</h3>
             <p className="text-sm text-neutral-600 mb-6">{confirmModal.message}</p>
             <div className="flex gap-3 justify-end">
-              <button 
-                onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors"
-              >
+              <button onClick={() => setConfirmModal(null)} className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors">
                 Annuler
               </button>
-              <button 
-                onClick={confirmModal.onConfirm}
-                className="px-4 py-2 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl transition-colors"
-              >
+              <button onClick={confirmModal.onConfirm} className="px-4 py-2 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl transition-colors">
                 Confirmer
               </button>
             </div>
@@ -562,17 +673,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Custom Alert Modal */}
       {alertModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">{alertModal.title}</h3>
             <p className="text-sm text-neutral-600 mb-6">{alertModal.message}</p>
             <div className="flex justify-end">
-              <button 
-                onClick={() => setAlertModal(null)}
-                className="px-4 py-2 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl transition-colors"
-              >
+              <button onClick={() => setAlertModal(null)} className="px-4 py-2 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl transition-colors">
                 OK
               </button>
             </div>
@@ -580,8 +687,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Install popup Android */}
       <InstallPopup />
-    </div>
+    </>
   );
 }
