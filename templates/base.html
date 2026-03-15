@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ComptaApp{% block title %}{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            success: '#10B981', danger: '#EF4444',
+            'success-light': '#D1FAE5', 'danger-light': '#FEE2E2',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .modal-backdrop { backdrop-filter: blur(4px); }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+    .slide-up { animation: slideUp 0.25s ease-out; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 2px; }
+  </style>
+</head>
+<body class="bg-neutral-100 text-neutral-900 antialiased">
+
+{% if current_user.is_authenticated %}
+<!-- Unified responsive layout: sidebar on desktop, bottom nav on mobile -->
+<div class="flex min-h-screen">
+
+  <!-- PC Sidebar (hidden on mobile) -->
+  <aside class="hidden md:flex w-64 bg-neutral-900 text-white flex-col fixed h-full z-10 shadow-2xl">
+    <div class="px-6 py-7 border-b border-white/10">
+      <a href="/" class="flex items-center gap-3">
+        <svg class="w-8 h-8 text-white" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="currentColor" fill-opacity="0.15"/>
+          <path d="M8 22V12l8-4 8 4v10l-8 4-8-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M8 12l8 4 8-4M16 16v10" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span class="text-xl font-bold">ComptaApp</span>
+      </a>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all {% if request.path == '/' %}bg-white text-neutral-900 shadow-sm{% else %}text-white/60 hover:text-white hover:bg-white/10{% endif %}">
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Mois
+      </a>
+      <a href="/history" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all {% if request.path == '/history' %}bg-white text-neutral-900 shadow-sm{% else %}text-white/60 hover:text-white hover:bg-white/10{% endif %}">
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/history' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Historique
+      </a>
+      <a href="/pro" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all {% if request.path == '/pro' %}bg-white text-neutral-900 shadow-sm{% else %}text-white/60 hover:text-white hover:bg-white/10{% endif %}">
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/pro' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        PRO
+        {% if current_user.is_pro %}<span class="ml-auto text-[9px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase tracking-widest">Actif</span>{% endif %}
+      </a>
+      <a href="/settings" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all {% if request.path == '/settings' %}bg-white text-neutral-900 shadow-sm{% else %}text-white/60 hover:text-white hover:bg-white/10{% endif %}">
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/settings' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Paramètres
+      </a>
+    </nav>
+    <div class="px-3 pb-3">
+      <button onclick="shareApp()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-[#25D366]/20 transition-all group">
+        <svg class="w-[18px] h-[18px] group-hover:text-[#25D366]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        Partager l'app
+      </button>
+    </div>
+    <div class="px-4 py-5 border-t border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-sm font-bold shrink-0">
+          {{ current_user.first_name[0].upper() if current_user.first_name else '?' }}
+        </div>
+        <div class="overflow-hidden flex-1">
+          <p class="text-sm font-semibold truncate">{{ current_user.first_name }}</p>
+          <p class="text-xs text-white/40 truncate">{{ current_user.company_name }}</p>
+        </div>
+        <a href="/logout" class="text-white/30 hover:text-white/70 transition-colors" title="Déconnexion">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content area -->
+  <div class="flex-1 md:ml-64 min-h-screen">
+    <!-- Mobile share button -->
+    <button onclick="shareApp()" class="md:hidden fixed bottom-24 left-4 w-11 h-11 bg-[#25D366] text-white rounded-2xl shadow-lg flex items-center justify-center z-30">
+      <svg class="w-[19px] h-[19px]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+    </button>
+
+    <!-- PC: centered card wrapper | Mobile: full width -->
+    <div class="md:flex md:items-start md:justify-center md:py-8 md:px-8 lg:px-12 md:min-h-screen md:bg-neutral-200">
+      <div class="w-full md:max-w-2xl lg:max-w-4xl">
+        <div class="bg-white md:rounded-3xl md:shadow-sm md:overflow-hidden md:border md:border-neutral-200 md:min-h-[600px]">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile bottom nav (hidden on desktop) -->
+  <nav class="md:hidden fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-neutral-100 px-6 py-4 flex justify-between items-center z-40">
+    <a href="/" class="flex flex-col items-center gap-1.5 transition-colors {% if request.path == '/' %}text-neutral-900{% else %}text-neutral-400{% endif %}">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <span class="text-[9px] font-semibold uppercase tracking-widest">Mois</span>
+    </a>
+    <a href="/history" class="flex flex-col items-center gap-1.5 transition-colors {% if request.path == '/history' %}text-neutral-900{% else %}text-neutral-400{% endif %}">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/history' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span class="text-[9px] font-semibold uppercase tracking-widest">Histo</span>
+    </a>
+    <a href="/pro" class="flex flex-col items-center gap-1.5 transition-colors {% if request.path == '/pro' %}text-neutral-900{% else %}text-neutral-400{% endif %}">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/pro' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      <span class="text-[9px] font-semibold uppercase tracking-widest">PRO</span>
+    </a>
+    <a href="/settings" class="flex flex-col items-center gap-1.5 transition-colors {% if request.path == '/settings' %}text-neutral-900{% else %}text-neutral-400{% endif %}">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="{% if request.path == '/settings' %}2.5{% else %}1.5{% endif %}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span class="text-[9px] font-semibold uppercase tracking-widest">Param</span>
+    </a>
+  </nav>
+</div>
+
+{% endif %}
+
+<!-- Global modals -->
+<div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="backdrop-filter:blur(4px)">
+  <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl slide-up">
+    <h3 id="confirmTitle" class="text-lg font-semibold text-neutral-900 mb-2"></h3>
+    <p id="confirmMsg" class="text-sm text-neutral-600 mb-6"></p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeConfirm()" class="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl">Annuler</button>
+      <button id="confirmOkBtn" class="px-4 py-2 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl">Confirmer</button>
+    </div>
+  </div>
+</div>
+<div id="alertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="backdrop-filter:blur(4px)">
+  <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl slide-up">
+    <h3 id="alertTitle" class="text-lg font-semibold text-neutral-900 mb-2"></h3>
+    <p id="alertMsg" class="text-sm text-neutral-600 mb-6"></p>
+    <div class="flex justify-end">
+      <button onclick="closeAlert()" class="px-4 py-2 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let _confirmCb = null;
+  function showConfirm(title, msg, cb) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent = msg;
+    _confirmCb = cb;
+    document.getElementById('confirmModal').classList.remove('hidden');
+  }
+  function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); _confirmCb = null; }
+  document.getElementById('confirmOkBtn').addEventListener('click', () => { if (_confirmCb) _confirmCb(); closeConfirm(); });
+  function showAlert(title, msg) {
+    document.getElementById('alertTitle').textContent = title;
+    document.getElementById('alertMsg').textContent = msg;
+    document.getElementById('alertModal').classList.remove('hidden');
+  }
+  function closeAlert() { document.getElementById('alertModal').classList.add('hidden'); }
+  function shareApp() {
+    const msg = `🧾 *ComptaApp* — L'application de comptabilité simple !\n\n✅ Suivi des entrées & dépenses\n✅ Export Excel\n\n👉 ${window.location.origin}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+  async function apiFetch(url, method='GET', body=null) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    return res.json();
+  }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

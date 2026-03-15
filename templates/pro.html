@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% block title %} — Espace PRO{% endblock %}
+
+{% block content %}
+<div class="min-h-screen pb-24">
+  <div class="bg-white px-6 pt-12 pb-8 shadow-sm border-b border-neutral-100">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 bg-neutral-900 rounded-2xl flex items-center justify-center shadow-lg">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+      </div>
+      <div>
+        {% if user.is_pro %}
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-bold text-neutral-900">Espace PRO</h1>
+          <span class="text-xs bg-green-100 text-green-700 font-bold px-2.5 py-1 rounded-full uppercase tracking-widest">Actif</span>
+        </div>
+        <p class="text-neutral-500 text-sm mt-0.5">Personnalisez votre comptabilité à l'infini.</p>
+        {% else %}
+        <h1 class="text-2xl font-bold text-neutral-900">Passez PRO</h1>
+        <p class="text-neutral-500 text-sm mt-0.5">Débloquez toutes les fonctionnalités avancées.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="px-6 py-8 space-y-6">
+
+    {% if not user.is_pro %}
+    <!-- Payment / Activation -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
+      <h2 class="text-sm font-semibold text-neutral-900 mb-6">Activer le plan PRO</h2>
+
+      <!-- Features list -->
+      <div class="space-y-3 mb-8">
+        {% set features = [
+          ('Transactions illimitées', 'Plus de limite de 20 transactions par mois'),
+          ('Périodes personnalisées', 'Sélectionnez n\'importe quelle plage de dates'),
+          ('Colonnes personnalisées', 'Ajoutez vos propres champs de saisie'),
+          ('Import Excel', 'Importez des données depuis vos fichiers Excel'),
+          ('Catégories sur mesure', 'Gérez vos catégories de revenus et dépenses'),
+          ('Noms de champs', 'Renommez les champs selon votre métier'),
+        ] %}
+        {% for feat, desc in features %}
+        <div class="flex items-start gap-3">
+          <div class="w-5 h-5 rounded-full bg-success-light flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-3 h-3 text-success" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-medium text-neutral-900">{{ feat }}</p>
+            <p class="text-xs text-neutral-500">{{ desc }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Subscription plans -->
+      <div class="bg-neutral-50 border border-neutral-100 rounded-2xl p-5">
+        <h3 class="text-sm font-semibold text-neutral-900 mb-4">Choisissez votre plan PRO</h3>
+        <div class="space-y-3 mb-6">
+          <label class="flex items-center gap-3 bg-white border border-neutral-200 rounded-xl p-4 cursor-pointer hover:border-neutral-900 transition-colors">
+            <input type="radio" name="plan" value="monthly" class="text-neutral-900 focus:ring-neutral-900" checked>
+            <div>
+              <p class="text-sm font-medium text-neutral-900">Mensuel - 10 000 FCFA</p>
+              <p class="text-xs text-neutral-500">Paiement mensuel</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 bg-white border border-neutral-200 rounded-xl p-4 cursor-pointer hover:border-neutral-900 transition-colors">
+            <input type="radio" name="plan" value="quarterly" class="text-neutral-900 focus:ring-neutral-900">
+            <div>
+              <p class="text-sm font-medium text-neutral-900">Trimestriel - 27 000 FCFA</p>
+              <p class="text-xs text-neutral-500">Paiement tous les 3 mois (10% de réduction)</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 bg-white border border-neutral-200 rounded-xl p-4 cursor-pointer hover:border-neutral-900 transition-colors">
+            <input type="radio" name="plan" value="annual" class="text-neutral-900 focus:ring-neutral-900">
+            <div>
+              <p class="text-sm font-medium text-neutral-900">Annuel - 108 000 FCFA</p>
+              <p class="text-xs text-neutral-500">Paiement annuel (10% de réduction)</p>
+            </div>
+          </label>
+        </div>
+        <button onclick="subscribePro()" class="w-full bg-neutral-900 text-white px-5 py-3 rounded-xl text-sm font-semibold hover:bg-neutral-800 transition-colors">Souscrire via WhatsApp</button>
+        <p class="text-xs text-neutral-400 mt-3">Vous serez redirigé vers WhatsApp pour finaliser votre abonnement.</p>
+      </div>
+    </div>
+    {% else %}
+
+    <!-- Custom fields management -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
+      <h2 class="text-sm font-semibold text-neutral-900 mb-2 flex items-center gap-2">
+        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h7"/></svg>
+        Organisation des colonnes
+      </h2>
+      <p class="text-xs text-neutral-500 mb-6">Réordonnez, masquez ou ajoutez des champs personnalisés.</p>
+
+      <div id="fieldsList" class="space-y-2 mb-6"></div>
+
+      <!-- Add custom field -->
+      <div class="bg-neutral-50 border border-neutral-100 rounded-2xl p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-3">Ajouter un champ</h3>
+        <div class="flex gap-2">
+          <input type="text" id="newFieldName" placeholder="Nom du champ"
+            class="flex-1 bg-white border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10"/>
+          <select id="newFieldType" class="w-28 bg-white border border-neutral-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none appearance-none">
+            <option value="text">Texte</option>
+            <option value="number">Nombre</option>
+          </select>
+          <button onclick="addCustomField()" class="bg-neutral-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-neutral-800 transition-colors">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pro features info -->
+    <div class="bg-neutral-900 text-white p-6 rounded-3xl shadow-sm">
+      <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        Votre compte PRO est actif
+      </h2>
+      <div class="space-y-2 text-sm text-white/70">
+        <p>✓ Transactions illimitées</p>
+        <p>✓ Sélection de périodes personnalisées</p>
+        <p>✓ Import / Export Excel</p>
+        <p>✓ Champs et catégories personnalisés</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if user.is_pro %}
+<script>
+  const SETTINGS = {{ settings.to_dict() | tojson }};
+  let fieldOrder = [...SETTINGS.field_order];
+  let hiddenFields = [...SETTINGS.hidden_fields];
+  let customFields = [...(SETTINGS.custom_fields || [])];
+
+  const STANDARD_NAMES = {
+    date: SETTINGS.field_labels.date || 'Date',
+    category: SETTINGS.field_labels.category || 'Catégorie',
+    label: SETTINGS.field_labels.label || 'Libellé',
+    observation: SETTINGS.field_labels.observation || 'Observation',
+    income: SETTINGS.field_labels.income || 'Entrée',
+    expense: SETTINGS.field_labels.expense || 'Dépense',
+    quantity: SETTINGS.field_labels.quantity || 'Quantité',
+  };
+
+  function getFieldName(id) {
+    if (STANDARD_NAMES[id]) return STANDARD_NAMES[id];
+    const cf = customFields.find(f => f.id === id);
+    return cf ? cf.name : id;
+  }
+  function isStandard(id) { return !!STANDARD_NAMES[id]; }
+
+  function renderFields() {
+    const el = document.getElementById('fieldsList');
+    el.innerHTML = fieldOrder.map((id, i) => {
+      const name = getFieldName(id);
+      const hidden = hiddenFields.includes(id);
+      const std = isStandard(id);
+      return `<div class="flex items-center gap-2 bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3">
+        <div class="flex flex-col gap-0.5 mr-1">
+          <button onclick="moveField(${i},'up')" class="text-neutral-300 hover:text-neutral-900 transition-colors" ${i===0?'disabled':''}>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <button onclick="moveField(${i},'down')" class="text-neutral-300 hover:text-neutral-900 transition-colors" ${i===fieldOrder.length-1?'disabled':''}>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <span class="flex-1 text-sm font-medium text-neutral-700">${name}</span>
+        <span class="text-[10px] text-neutral-400 uppercase tracking-wider">${std?'standard':'custom'}</span>
+        <button onclick="toggleHide('${id}')" class="text-neutral-400 hover:text-neutral-900 transition-colors ml-1" title="${hidden?'Afficher':'Masquer'}">
+          ${hidden
+            ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>'
+            : '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>'
+          }
+        </button>
+        ${!std ? `<button onclick="removeCustomField('${id}')" class="text-neutral-400 hover:text-danger transition-colors ml-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function moveField(i, dir) {
+    if (dir === 'up' && i > 0) [fieldOrder[i-1], fieldOrder[i]] = [fieldOrder[i], fieldOrder[i-1]];
+    else if (dir === 'down' && i < fieldOrder.length-1) [fieldOrder[i+1], fieldOrder[i]] = [fieldOrder[i], fieldOrder[i+1]];
+    saveFields(); renderFields();
+  }
+
+  function toggleHide(id) {
+    hiddenFields = hiddenFields.includes(id) ? hiddenFields.filter(h => h !== id) : [...hiddenFields, id];
+    saveFields(); renderFields();
+  }
+
+  function addCustomField() {
+    const name = document.getElementById('newFieldName').value.trim();
+    const type = document.getElementById('newFieldType').value;
+    if (!name) return;
+    const id = 'cf_' + Date.now();
+    customFields.push({ id, name, type });
+    fieldOrder.push(id);
+    document.getElementById('newFieldName').value = '';
+    saveFields(); renderFields();
+  }
+
+  function removeCustomField(id) {
+    customFields = customFields.filter(f => f.id !== id);
+    fieldOrder = fieldOrder.filter(f => f !== id);
+    hiddenFields = hiddenFields.filter(f => f !== id);
+    saveFields(); renderFields();
+  }
+
+  async function saveFields() {
+    await apiFetch('/api/settings', 'POST', { field_order: fieldOrder, hidden_fields: hiddenFields, custom_fields: customFields });
+  }
+
+  renderFields();
+</script>
+{% else %}
+<script>
+  async function subscribePro() {
+    const selectedPlan = document.querySelector('input[name="plan"]:checked').value;
+    const res = await apiFetch('/api/subscribe-pro', 'POST', { plan: selectedPlan });
+    if (res.success) {
+      window.open(res.whatsapp_url, '_blank');
+    } else {
+      alert(res.error || 'Erreur lors de la souscription.');
+    }
+  }
+</script>
+{% endif %}
+{% endblock %}

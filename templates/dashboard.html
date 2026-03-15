@@ -1,0 +1,455 @@
+{% extends 'base.html' %}
+{% block title %} — Tableau de bord{% endblock %}
+
+{% block content %}
+<div class="pb-24">
+  <!-- Header -->
+  <div class="bg-white px-6 pt-12 md:pt-8 pb-8 shadow-sm border-b border-neutral-100">
+    <!-- Mobile logo/greeting -->
+    <div class="md:hidden flex items-center justify-between mb-6">
+      <div class="flex items-center gap-3">
+        <svg class="w-8 h-8 text-neutral-900" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="currentColor" fill-opacity="0.1"/>
+          <path d="M8 22V12l8-4 8 4v10l-8 4-8-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M8 12l8 4 8-4M16 16v10" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span class="text-xl font-bold text-neutral-900">ComptaApp</span>
+      </div>
+      <h2 class="text-sm font-medium text-neutral-500">{{ greeting }} 👋</h2>
+    </div>
+
+    <!-- Period navigation -->
+    <div class="flex justify-between items-center mb-8">
+      <a href="/?year={{ prev_year }}&month={{ prev_month }}" class="p-2 -ml-2 text-neutral-400 hover:text-neutral-900 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+
+      {% if user.is_pro %}
+      <button onclick="openPeriodModal()" class="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-neutral-900 hover:opacity-70 transition-opacity">
+        {{ period_name }}
+        <svg class="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
+      {% else %}
+      <span class="text-xs font-semibold uppercase tracking-widest text-neutral-500">{{ period_name }}</span>
+      {% endif %}
+
+      <a href="/?year={{ next_year }}&month={{ next_month }}" class="p-2 -mr-2 text-neutral-400 hover:text-neutral-900 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+
+    <!-- Net balance -->
+    <div class="text-center mb-10">
+      <p class="text-neutral-400 text-xs uppercase tracking-widest mb-2 font-medium">Solde Net</p>
+      <h1 class="text-5xl font-light tracking-tight {% if net_balance_raw >= 0 %}text-neutral-900{% else %}text-danger{% endif %} font-mono">
+        {{ net_balance }}
+      </h1>
+    </div>
+
+    <!-- Income / Expense cards -->
+    <div class="flex gap-4">
+      <div class="flex-1 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
+        <div class="flex items-center gap-2 text-neutral-500 mb-2">
+          <div class="w-1.5 h-1.5 rounded-full bg-success"></div>
+          <span class="text-[10px] font-semibold uppercase tracking-widest">{{ settings.field_labels.get('income', 'Entrées') }}</span>
+        </div>
+        <p class="font-mono text-lg font-medium text-neutral-900">{{ total_income }}</p>
+      </div>
+      <div class="flex-1 bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
+        <div class="flex items-center gap-2 text-neutral-500 mb-2">
+          <div class="w-1.5 h-1.5 rounded-full bg-danger"></div>
+          <span class="text-[10px] font-semibold uppercase tracking-widest">{{ settings.field_labels.get('expense', 'Dépenses') }}</span>
+        </div>
+        <p class="font-mono text-lg font-medium text-neutral-900">{{ total_expense }}</p>
+      </div>
+    </div>
+
+    <!-- Performance -->
+    <div class="mt-8">
+      <h3 class="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4">Performances</h3>
+      {% if observation %}
+      <div class="border rounded-xl p-4 mb-4 flex items-start gap-3 {% if observation.type == 'positive' %}bg-success-light border-success/20 text-success{% elif observation.type == 'negative' %}bg-danger-light border-danger/20 text-danger{% else %}bg-neutral-50 border-neutral-100 text-neutral-700{% endif %}">
+        <div class="mt-0.5">
+          {% if observation.type == 'positive' %}
+          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          {% elif observation.type == 'negative' %}
+          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+          {% else %}
+          <svg class="w-[18px] h-[18px] opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          {% endif %}
+        </div>
+        <p class="text-sm leading-relaxed font-medium">{{ observation.text }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Chart -->
+      <div id="chartContainer" class="h-64 w-full mt-4">
+        {% if transactions %}
+        <canvas id="dashChart"></canvas>
+        {% else %}
+        <div class="h-48 flex items-center justify-center text-neutral-400 text-sm italic">Pas assez de données pour le graphique</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions section -->
+  <div class="px-6 py-8">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xs font-semibold uppercase tracking-widest text-neutral-400">Transactions</h3>
+      <div class="flex items-center gap-4">
+        {% if user.is_pro %}
+        <label class="flex items-center gap-1.5 text-xs font-medium text-neutral-900 hover:opacity-70 transition-opacity cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importer
+          <input type="file" accept=".xlsx,.xls" class="hidden" id="importFile" onchange="handleImport(event)"/>
+        </label>
+        {% endif %}
+        <a href="/api/export?year={{ year }}&month={{ month }}&end_year={{ end_year }}&end_month={{ end_month }}"
+          class="flex items-center gap-1.5 text-xs font-medium text-neutral-900 hover:opacity-70 transition-opacity">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exporter
+        </a>
+      </div>
+    </div>
+
+    <!-- Free plan banner -->
+    {% if not user.is_pro %}
+    <div class="mb-8 bg-neutral-900 text-white p-4 rounded-2xl flex justify-between items-center shadow-lg">
+      <div>
+        <p class="text-sm font-medium">Plan Gratuit</p>
+        <p class="text-xs text-neutral-400 mt-0.5">{{ remaining }} transactions restantes</p>
+      </div>
+      <a href="/pro" class="text-xs font-bold bg-white text-neutral-900 px-4 py-2 rounded-xl hover:bg-neutral-100 transition-colors">Passer PRO</a>
+    </div>
+    {% endif %}
+
+    <!-- Transaction list -->
+    <div id="txList" class="space-y-1">
+      {% if not transactions %}
+      <div class="text-center py-12 text-neutral-400">
+        <svg class="w-8 h-8 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <p class="text-sm">Aucune transaction pour cette période</p>
+      </div>
+      {% else %}
+      {% for t in transactions %}
+      <div class="group flex items-center justify-between py-4 border-b border-neutral-100 last:border-0"
+           data-id="{{ t.id }}" data-date="{{ t.date.isoformat() }}">
+        <div class="flex items-center gap-4">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 {% if t.type == 'income' %}bg-success-light text-success{% else %}bg-danger-light text-danger{% endif %}">
+            {% if t.type == 'income' %}
+            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            {% else %}
+            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            {% endif %}
+          </div>
+          <div>
+            <p class="font-medium text-neutral-900 text-sm">
+              {{ t.label or t.category }}
+              {% if t.quantity and t.quantity > 1 %}<span class="text-neutral-400 text-xs ml-1.5 font-normal">x{{ t.quantity }}</span>{% endif %}
+            </p>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">{{ t.category }}</span>
+              <span class="w-1 h-1 rounded-full bg-neutral-300"></span>
+              <span class="text-[10px] text-neutral-500">{{ t.date.strftime('%d %b') }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="text-right flex items-center gap-3">
+          <div class="flex flex-col items-end">
+            <p class="font-mono font-medium text-sm {% if t.type == 'income' %}text-success{% else %}text-neutral-900{% endif %}">
+              {% if t.type == 'income' %}+{% else %}-{% endif %}{{ fmt(t.amount) }}
+            </p>
+            <div class="flex gap-2 mt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+              <button onclick="openEditModal('{{ t.id }}')" class="text-neutral-400 hover:text-neutral-900 p-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </button>
+              <button onclick="deleteTransaction('{{ t.id }}')" class="text-neutral-400 hover:text-danger p-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button onclick="openNewModal()"
+    class="fixed bottom-24 right-6 md:bottom-8 md:right-8 w-14 h-14 bg-neutral-900 text-white rounded-2xl shadow-xl flex items-center justify-center hover:bg-neutral-800 transition-transform active:scale-95 z-30">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+</div>
+
+<!-- ── Transaction Modal ──────────────────────────────────────────────────── -->
+<div id="txModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 modal-backdrop p-4">
+  <div class="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-8 shadow-2xl max-h-[90vh] overflow-y-auto slide-up">
+    <div class="flex justify-between items-center mb-8">
+      <h2 id="txModalTitle" class="text-lg font-semibold text-neutral-900">Nouvelle transaction</h2>
+      <button onclick="closeTxModal()" class="p-2 -mr-2 text-neutral-400 hover:text-neutral-900 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="txModalBody"></div>
+  </div>
+</div>
+
+<!-- ── Period Modal (Pro) ─────────────────────────────────────────────────── -->
+{% if user.is_pro %}
+<div id="periodModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-backdrop p-4">
+  <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl slide-up">
+    <h3 class="text-lg font-semibold text-neutral-900 mb-6">Sélectionner une période</h3>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">Mois de début</label>
+        <input type="month" id="periodStart" class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10" value="{{ '%04d-%02d'|format(year, month) }}"/>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">Mois de fin</label>
+        <input type="month" id="periodEnd" class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10" value="{{ '%04d-%02d'|format(end_year, end_month) }}"/>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closePeriodModal()" class="flex-1 px-4 py-3 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors">Annuler</button>
+      <button onclick="applyPeriod()" class="flex-1 px-4 py-3 text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 rounded-xl transition-colors">Appliquer</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── Settings & data ──────────────────────────────────────────────────────
+  const SETTINGS = {{ settings.to_dict() | tojson }};
+  const CHART_DATA = {{ chart_data | safe }};
+  const CURRENT_YEAR = {{ year }};
+  const CURRENT_MONTH = {{ month }};
+  const IS_PRO = {{ 'true' if user.is_pro else 'false' }};
+
+  // All transactions for JS (edit)
+  const TX_MAP = {};
+  {% for t in transactions %}
+  TX_MAP['{{ t.id }}'] = {
+    id: '{{ t.id }}', type: '{{ t.type }}', amount: {{ t.amount }},
+    quantity: {{ t.quantity or 1 }}, label: {{ (t.label or '') | tojson }},
+    category: {{ t.category | tojson }}, observation: {{ (t.observation or '') | tojson }},
+    date: '{{ t.date.isoformat() }}', custom_data: {{ (t.custom_data) | tojson }}
+  };
+  {% endfor %}
+
+  // ── Chart ────────────────────────────────────────────────────────────────
+  if (CHART_DATA.length > 0) {
+    const ctx = document.getElementById('dashChart').getContext('2d');
+    const labels = CHART_DATA.map(d => d.date);
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar', label: SETTINGS.field_labels.income + ' du jour', data: CHART_DATA.map(d => d.income), backgroundColor: '#10B981', borderRadius: 4, maxBarThickness: 20 },
+          { type: 'bar', label: SETTINGS.field_labels.expense + ' du jour', data: CHART_DATA.map(d => d.expense), backgroundColor: '#EF4444', borderRadius: 4, maxBarThickness: 20 },
+          { type: 'line', label: 'Solde cumulé', data: CHART_DATA.map(d => d.balance), borderColor: '#6366f1', borderWidth: 3, fill: true, backgroundColor: 'rgba(99,102,241,0.08)', tension: 0.4, pointRadius: 3, pointBackgroundColor: '#6366f1' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, usePointStyle: true, boxWidth: 8 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('fr-FR')} ${SETTINGS.currency}` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#a3a3a3' }, border: { display: false } },
+          y: { position: 'right', grid: { color: '#f5f5f5' }, ticks: { font: { size: 10 }, color: '#a3a3a3', callback: v => v.toLocaleString('fr-FR', { notation: 'compact' }) }, border: { display: false } }
+        }
+      }
+    });
+  }
+
+  // ── Transaction Modal ────────────────────────────────────────────────────
+  let editingId = null;
+
+  function buildModalForm(tx) {
+    const fl = SETTINGS.field_labels;
+    const cats = SETTINGS.categories;
+    const fieldOrder = SETTINGS.field_order;
+    const hidden = SETTINGS.hidden_fields;
+    const customFields = SETTINGS.custom_fields || [];
+    const visible = fieldOrder.filter(f => !hidden.includes(f));
+    let html = '<form id="txForm" class="space-y-6" onsubmit="saveTx(event)">';
+
+    for (const fid of visible) {
+      if (fid === 'income') {
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-success mb-2">${fl.income || 'Entrée'}</label>
+          <div class="relative">
+            <input type="number" id="incomeAmt" min="0" step="0.01"
+              value="${tx && tx.type==='income' ? tx.amount : ''}"
+              oninput="setTypeFromIncome()"
+              class="w-full bg-transparent border-b-2 border-neutral-100 px-0 py-2 text-4xl font-mono font-light text-success focus:outline-none focus:border-success transition-colors placeholder:text-neutral-200"
+              placeholder="0"/>
+            <span class="absolute right-0 bottom-4 text-neutral-400 font-medium text-lg">${SETTINGS.currency}</span>
+          </div></div>`;
+      } else if (fid === 'expense') {
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-danger mb-2">${fl.expense || 'Dépense'}</label>
+          <div class="relative">
+            <input type="number" id="expenseAmt" min="0" step="0.01"
+              value="${tx && tx.type==='expense' ? tx.amount : ''}"
+              oninput="setTypeFromExpense()"
+              class="w-full bg-transparent border-b-2 border-neutral-100 px-0 py-2 text-4xl font-mono font-light text-danger focus:outline-none focus:border-danger transition-colors placeholder:text-neutral-200"
+              placeholder="0"/>
+            <span class="absolute right-0 bottom-4 text-neutral-400 font-medium text-lg">${SETTINGS.currency}</span>
+          </div></div>`;
+      } else if (fid === 'quantity') {
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.quantity || 'Quantité'}</label>
+          <input type="number" id="quantity" min="1" step="1" value="${tx ? tx.quantity : 1}"
+            class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10" placeholder="1"/></div>`;
+      } else if (fid === 'label') {
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.label || 'Libellé'} (Optionnel)</label>
+          <input type="text" id="label" value="${(tx && tx.label) ? tx.label.replace(/"/g,'&quot;') : ''}"
+            class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+            placeholder="Ex: Vente de chaussures"/></div>`;
+      } else if (fid === 'category') {
+        const type = tx ? tx.type : 'income';
+        const catsForType = cats[type] || [];
+        const opts = [...catsForType, 'Autre'].map(c => `<option value="${c}" ${(tx && tx.category===c) ? 'selected' : ''}>${c}</option>`).join('');
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.category || 'Catégorie'}</label>
+          <select id="category" class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">${opts}</select></div>`;
+      } else if (fid === 'date') {
+        const d = tx ? tx.date : new Date().toISOString().slice(0,10);
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.date || 'Date'}</label>
+          <input type="date" id="txDate" required value="${d}"
+            class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10"/></div>`;
+      } else if (fid === 'observation') {
+        html += `<div>
+          <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.observation || 'Observation'} (Optionnel)</label>
+          <textarea id="observation" rows="2"
+            class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10 resize-none"
+            placeholder="Détails supplémentaires...">${(tx && tx.observation) ? tx.observation : ''}</textarea></div>`;
+      } else {
+        const cf = customFields.find(f => f.id === fid);
+        if (cf) {
+          const val = (tx && tx.custom_data && tx.custom_data[cf.id]) ? tx.custom_data[cf.id] : '';
+          html += `<div>
+            <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${cf.name}</label>
+            <input type="${cf.type}" id="cf_${cf.id}" value="${val}"
+              class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+              placeholder="Saisir ${cf.name.toLowerCase()}"/></div>`;
+        }
+      }
+    }
+
+    html += `<button type="submit" class="w-full bg-neutral-900 text-white font-semibold py-4 rounded-xl mt-8 hover:bg-neutral-800 transition-colors active:scale-95">Enregistrer</button></form>`;
+    return html;
+  }
+
+  let currentTxType = 'income';
+  function setTypeFromIncome() { currentTxType = 'income'; document.getElementById('expenseAmt').value = ''; updateCategories(); }
+  function setTypeFromExpense() { currentTxType = 'expense'; document.getElementById('incomeAmt').value = ''; updateCategories(); }
+  function updateCategories() {
+    const sel = document.getElementById('category');
+    if (!sel) return;
+    const cats = SETTINGS.categories[currentTxType] || [];
+    sel.innerHTML = [...cats, 'Autre'].map(c => `<option value="${c}">${c}</option>`).join('');
+  }
+
+  function openNewModal() {
+    if (!IS_PRO) {
+      const rem = {{ remaining or 0 }};
+      if (rem <= 0) { window.location.href = '/pro'; return; }
+    }
+    editingId = null;
+    document.getElementById('txModalTitle').textContent = 'Nouvelle transaction';
+    document.getElementById('txModalBody').innerHTML = buildModalForm(null);
+    document.getElementById('txModal').classList.remove('hidden');
+    currentTxType = 'income';
+  }
+
+  function openEditModal(id) {
+    const tx = TX_MAP[id];
+    if (!tx) return;
+    editingId = id;
+    document.getElementById('txModalTitle').textContent = 'Modifier la transaction';
+    document.getElementById('txModalBody').innerHTML = buildModalForm(tx);
+    document.getElementById('txModal').classList.remove('hidden');
+    currentTxType = tx.type;
+  }
+
+  function closeTxModal() { document.getElementById('txModal').classList.add('hidden'); editingId = null; }
+
+  async function saveTx(e) {
+    e.preventDefault();
+    const incEl = document.getElementById('incomeAmt');
+    const expEl = document.getElementById('expenseAmt');
+    const incVal = parseFloat(incEl ? incEl.value : 0) || 0;
+    const expVal = parseFloat(expEl ? expEl.value : 0) || 0;
+    if (incVal <= 0 && expVal <= 0) { alert('Veuillez saisir un montant.'); return; }
+    const type = incVal > 0 ? 'income' : 'expense';
+    const amount = incVal > 0 ? incVal : expVal;
+    const category = document.getElementById('category')?.value || '';
+    const label = document.getElementById('label')?.value || '';
+    const obs = document.getElementById('observation')?.value || '';
+    const qty = parseInt(document.getElementById('quantity')?.value || '1');
+    const txDate = document.getElementById('txDate').value;
+    const customData = {};
+    for (const cf of (SETTINGS.custom_fields || [])) {
+      const el = document.getElementById(`cf_${cf.id}`);
+      if (el) customData[cf.id] = el.value;
+    }
+
+    const payload = { type, amount, category, label, observation: obs, quantity: qty, date: txDate, custom_data: customData };
+    let res;
+    if (editingId) {
+      res = await apiFetch(`/api/transactions/${editingId}`, 'PUT', payload);
+    } else {
+      res = await apiFetch('/api/transactions', 'POST', payload);
+    }
+    if (res.success) {
+      closeTxModal();
+      window.location.reload();
+    } else {
+      showAlert('Erreur', res.error || 'Une erreur est survenue.');
+    }
+  }
+
+  function deleteTransaction(id) {
+    showConfirm('Supprimer', 'Voulez-vous vraiment supprimer cette transaction ?', async () => {
+      const res = await apiFetch(`/api/transactions/${id}`, 'DELETE');
+      if (res.success) window.location.reload();
+      else showAlert('Erreur', 'Impossible de supprimer.');
+    });
+  }
+
+  // ── Period Modal ─────────────────────────────────────────────────────────
+  function openPeriodModal() { document.getElementById('periodModal').classList.remove('hidden'); }
+  function closePeriodModal() { document.getElementById('periodModal').classList.add('hidden'); }
+  function applyPeriod() {
+    const start = document.getElementById('periodStart').value;
+    const end = document.getElementById('periodEnd').value;
+    if (!start || !end) return;
+    const [sy, sm] = start.split('-');
+    const [ey, em] = end.split('-');
+    window.location.href = `/?year=${sy}&month=${sm}&end_year=${ey}&end_month=${em}`;
+  }
+
+  // ── Import ───────────────────────────────────────────────────────────────
+  function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    showConfirm('Importer des données', "L'importation va ajouter les transactions du fichier. Voulez-vous continuer ?", async () => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/import', { method: 'POST', body: fd });
+      const data = await res.json();
+      showAlert(data.success ? 'Succès' : 'Erreur', data.message || data.error || 'Terminé');
+      if (data.success) setTimeout(() => window.location.reload(), 800);
+    });
+    e.target.value = '';
+  }
+</script>
+{% endblock %}
