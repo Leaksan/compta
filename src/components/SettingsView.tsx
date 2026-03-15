@@ -241,7 +241,7 @@ export default function SettingsView({ onBack }: Props) {
                     Personnalisation des champs
                   </h3>
                   <p className="text-xs text-neutral-500 mb-4">Modifiez les noms des champs standards selon vos besoins.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {Object.entries(fieldLabels).map(([key, value]) => (
                       <div key={key}>
                         <label className="block text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-1.5 ml-1">

@@ -90,7 +90,7 @@ export default function CategoryManager({ categories, onChange, fieldLabels }: P
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-widest text-success mb-3">{fieldLabels?.income ? fieldLabels.income + 's' : 'Entrées'}</h3>
           {incomes.length === 0 ? (

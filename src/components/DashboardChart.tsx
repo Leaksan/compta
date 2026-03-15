@@ -52,7 +52,7 @@ export default function DashboardChart({ transactions, currency, fieldLabels }: 
   }
 
   return (
-    <div className="h-72 w-full mt-8">
+    <div className="h-64 md:h-72 lg:h-80 xl:h-96 w-full mt-8">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
           <defs>
