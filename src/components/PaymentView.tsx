@@ -1,202 +1,143 @@
 import { useState, useEffect } from 'react';
-import { Crown, Check, Zap, ArrowLeft, MessageCircle, Star } from 'lucide-react';
-import { getUserProfile } from '../storage';
-import { apiGetWhatsAppNumber } from '../api';
+import { Crown, Check, ArrowRight, MessageCircle, X, Sparkles } from 'lucide-react';
+import { getUserProfile, getWhatsAppConfig } from '../storage';
 
 interface Props {
-  onBack: () => void;
+  onClose: () => void;
 }
 
-const PLANS = [
-  {
-    id: 'monthly',
-    label: 'Mensuel',
-    price: 10000,
-    period: '/ mois',
-    monthly: 10000,
-    badge: null,
-    highlight: false,
-    description: 'Idéal pour démarrer',
-  },
-  {
-    id: 'quarterly',
-    label: 'Trimestriel',
-    price: 27000,
-    period: '/ 3 mois',
-    monthly: 9000,
-    badge: '10% de réduction',
-    highlight: true,
-    description: 'Le plus populaire',
-  },
-  {
-    id: 'yearly',
-    label: 'Annuel',
-    price: 108000,
-    period: '/ an',
-    monthly: 9000,
-    badge: '10% de réduction',
-    highlight: false,
-    description: 'La meilleure valeur',
-  },
-];
+type Plan = 'monthly' | 'quarterly' | 'annual';
 
-export default function PaymentView({ onBack }: Props) {
-  const [selected, setSelected] = useState('quarterly');
-  const [waNumber, setWaNumber] = useState('');
-  const profile = getUserProfile();
+const PLANS: Record<Plan, { label: string; months: number; price: number; discount: number; badge?: string }> = {
+  monthly: { label: 'Mensuel', months: 1, price: 10000, discount: 0 },
+  quarterly: { label: 'Trimestriel', months: 3, price: 10000 * 3, discount: 10, badge: '-10%' },
+  annual: { label: 'Annuel', months: 12, price: 10000 * 12, discount: 10, badge: '-10% 🔥' },
+};
+
+function formatPrice(amount: number): string {
+  return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(amount) + ' FCFA';
+}
+
+export default function PaymentView({ onClose }: Props) {
+  const [selectedPlan, setSelectedPlan] = useState<Plan>('monthly');
+  const [whatsappNumber, setWhatsappNumber] = useState('22900000000');
 
   useEffect(() => {
-    apiGetWhatsAppNumber().then(num => setWaNumber(num));
+    getWhatsAppConfig().then(setWhatsappNumber);
   }, []);
 
+  const plan = PLANS[selectedPlan];
+  const finalPrice = Math.round(plan.price * (1 - plan.discount / 100));
+
   const handleBuy = () => {
-    const plan = PLANS.find(p => p.id === selected)!;
-    const planLabels: Record<string, string> = {
-      monthly: 'Plan Mensuel — 10 000 FCFA/mois',
-      quarterly: 'Plan Trimestriel — 27 000 FCFA (3 mois, -10%)',
-      yearly: 'Plan Annuel — 108 000 FCFA (12 mois, -10%)',
-    };
+    const profile = getUserProfile();
+    const name = profile?.firstName || 'Client';
+    const company = profile?.companyName || '';
+    const phone = profile?.whatsapp || '';
 
-    const message = `Bonjour 👋, je souhaite souscrire à ComptaApp PRO.
-
-📋 *Mes informations :*
-• Prénom : ${profile?.firstName || 'Non renseigné'}
-• Entreprise : ${profile?.companyName || 'Non renseignée'}
-• WhatsApp : ${profile?.whatsapp || 'Non renseigné'}${profile?.email ? `\n• Email : ${profile.email}` : ''}
-
-💳 *Plan choisi :*
-${planLabels[selected]}
-
-Merci de confirmer ma souscription !`;
+    const planLabel = `${plan.label}${plan.months > 1 ? ` (${plan.months} mois)` : ''}`;
+    const message = [
+      `🔐 *Demande d'abonnement PRO — Compta*`,
+      ``,
+      `👤 Nom : ${name}`,
+      company ? `🏢 Entreprise : ${company}` : '',
+      phone ? `📱 WhatsApp : ${phone}` : '',
+      ``,
+      `📦 Plan choisi : *${planLabel}*`,
+      `💰 Montant : *${formatPrice(finalPrice)}*`,
+      plan.discount > 0 ? `🎁 Réduction appliquée : ${plan.discount}%` : '',
+      ``,
+      `Merci de procéder au paiement pour activer mon compte PRO.`,
+    ].filter(Boolean).join('\n');
 
     const encoded = encodeURIComponent(message);
-    const number = waNumber.replace(/\D/g, '');
-    if (!number) {
-      alert('Le numéro WhatsApp de paiement n\'est pas encore configuré. Contactez l\'administrateur.');
-      return;
-    }
-    window.open(`https://wa.me/${number}?text=${encoded}`, '_blank');
+    const clean = whatsappNumber.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${clean}?text=${encoded}`, '_blank');
   };
 
   return (
-    <div className="min-h-screen bg-neutral-100 pb-24 md:pb-8">
-      {/* Header */}
-      <div className="bg-neutral-900 px-6 pt-12 pb-10 text-white relative overflow-hidden">
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/5 rounded-full" />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/5 rounded-full" />
-        <button
-          onClick={onBack}
-          className="relative z-10 flex items-center gap-2 text-white/60 hover:text-white mb-6 text-sm transition-colors"
-        >
-          <ArrowLeft size={16} /> Retour
-        </button>
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
-            <Crown size={28} className="text-yellow-400" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4">
+        {/* Header */}
+        <div className="bg-neutral-900 text-white px-6 pt-8 pb-6 relative">
+          <button onClick={onClose} className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors p-1">
+            <X size={20} />
+          </button>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center">
+              <Crown size={22} className="text-yellow-400" />
+            </div>
+            <div>
+              <h2 className="font-bold text-lg leading-tight">Passer à PRO</h2>
+              <p className="text-neutral-400 text-xs">Transactions illimitées & plus</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Passer en PRO</h1>
-            <p className="text-white/50 text-sm mt-1">Déverrouillez toutes les fonctionnalités</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Features recap */}
-      <div className="px-6 py-5">
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
-          <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4">Inclus dans PRO</p>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              'Transactions illimitées',
-              'Champs personnalisés',
-              'Export Excel avancé',
-              'Historique complet',
-              'Plusieurs périodes',
-              'Support prioritaire',
-            ].map(f => (
-              <div key={f} className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center shrink-0">
-                  <Check size={11} className="text-green-600" strokeWidth={3} />
-                </div>
-                <span className="text-xs text-neutral-700">{f}</span>
-              </div>
+          <div className="flex gap-2 mt-4">
+            {(['monthly', 'quarterly', 'annual'] as Plan[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setSelectedPlan(p)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all relative ${
+                  selectedPlan === p ? 'bg-white text-neutral-900' : 'bg-white/10 text-neutral-300 hover:bg-white/20'
+                }`}
+              >
+                {PLANS[p].badge && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-yellow-400 text-neutral-900 text-[9px] font-black px-2 py-0.5 rounded-full whitespace-nowrap">
+                    {PLANS[p].badge}
+                  </span>
+                )}
+                {PLANS[p].label}
+              </button>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Plans */}
-      <div className="px-6">
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-4">Choisissez votre plan</p>
-        <div className="space-y-3">
-          {PLANS.map(plan => (
-            <button
-              key={plan.id}
-              onClick={() => setSelected(plan.id)}
-              className={`w-full text-left p-4 rounded-2xl border-2 transition-all relative overflow-hidden ${
-                selected === plan.id
-                  ? 'border-neutral-900 bg-neutral-900 text-white shadow-lg scale-[1.01]'
-                  : 'border-neutral-200 bg-white text-neutral-900 hover:border-neutral-400'
-              }`}
-            >
-              {plan.badge && (
-                <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                  selected === plan.id ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
-                }`}>
-                  {plan.badge}
-                </span>
-              )}
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    {plan.highlight && <Star size={13} className={selected === plan.id ? 'text-yellow-400 fill-yellow-400' : 'text-yellow-500 fill-yellow-500'} />}
-                    <span className="font-bold text-base">{plan.label}</span>
-                  </div>
-                  <p className={`text-xs ${selected === plan.id ? 'text-white/50' : 'text-neutral-400'}`}>{plan.description}</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-xl">{plan.price.toLocaleString('fr-FR')} <span className="text-sm font-medium">FCFA</span></div>
-                  <div className={`text-xs ${selected === plan.id ? 'text-white/50' : 'text-neutral-400'}`}>
-                    {plan.period}
-                    {plan.id !== 'monthly' && (
-                      <span className="ml-1">· {plan.monthly.toLocaleString('fr-FR')} FCFA/mois</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {selected === plan.id && (
-                <div className="absolute right-4 bottom-4">
-                  <div className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center">
-                    <Check size={11} strokeWidth={3} className="text-white" />
-                  </div>
-                </div>
-              )}
-            </button>
-          ))}
+        {/* Price */}
+        <div className="px-6 py-5 border-b border-neutral-100">
+          <div className="flex items-baseline gap-3">
+            <span className="text-4xl font-bold text-neutral-900 font-mono">{formatPrice(finalPrice)}</span>
+            {plan.discount > 0 && (
+              <span className="text-sm text-neutral-400 line-through">{formatPrice(plan.price)}</span>
+            )}
+          </div>
+          <p className="text-xs text-neutral-400 mt-1">
+            {plan.months === 1 ? 'par mois' : `pour ${plan.months} mois`}
+            {plan.discount > 0 && <span className="text-green-600 font-semibold ml-1">— {plan.discount}% de réduction</span>}
+          </p>
         </div>
-      </div>
 
-      {/* CTA */}
-      <div className="px-6 mt-6">
-        <button
-          onClick={handleBuy}
-          className="w-full bg-[#25D366] hover:bg-[#1ebe5d] active:scale-[.98] transition-all text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-green-900/20 text-base"
-        >
-          <MessageCircle size={22} className="fill-white" />
-          Acheter via WhatsApp
-        </button>
-        <p className="text-center text-xs text-neutral-400 mt-3 leading-relaxed">
-          Vous serez redirigé vers WhatsApp avec un message pré-rempli.<br />
-          Votre accès PRO sera activé après confirmation du paiement.
-        </p>
-      </div>
+        {/* Features */}
+        <div className="px-6 py-5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-4">Inclus dans PRO</p>
+          <ul className="space-y-3">
+            {[
+              'Transactions illimitées',
+              'Champs personnalisés illimités',
+              'Export Excel sur mesure',
+              'Analyse multi-périodes',
+              'Support prioritaire',
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-3 text-sm text-neutral-700">
+                <Check size={16} className="text-green-500 shrink-0" strokeWidth={3} />
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      {/* Already have code? */}
-      <div className="px-6 mt-5">
-        <div className="bg-white rounded-2xl p-4 border border-neutral-100 text-center">
-          <Zap size={16} className="mx-auto text-neutral-400 mb-2" />
-          <p className="text-xs text-neutral-500">
-            Déjà un code d'activation ? Contactez votre administrateur pour l'activer directement.
+        {/* CTA */}
+        <div className="px-6 pb-8">
+          <button
+            onClick={handleBuy}
+            className="w-full bg-neutral-900 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-neutral-800 transition-all active:scale-95 shadow-lg"
+          >
+            <MessageCircle size={20} className="text-green-400" />
+            Acheter via WhatsApp
+            <ArrowRight size={18} />
+          </button>
+          <p className="text-center text-xs text-neutral-400 mt-3">
+            <Sparkles size={12} className="inline mr-1" />
+            Un message pré-rempli sera envoyé à notre équipe
           </p>
         </div>
       </div>
