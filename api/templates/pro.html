@@ -1,8 +1,8 @@
-{% extends 'base.html' %}
+ {% extends 'base.html' %}
 {% block title %} — PRO{% endblock %}
 
 {% block content %}
-<div class="min-h-screen pb-24">
+<div class="min-h-screen pb-24 overflow-x-hidden">
   <div class="bg-white px-6 pt-12 pb-8 shadow-sm border-b border-neutral-100">
     <h1 class="text-3xl font-light tracking-tight text-neutral-900 mb-2">Version PRO</h1>
     <p class="text-neutral-500 text-sm">Libérez tout le potentiel de votre comptabilité</p>
@@ -100,7 +100,7 @@
           <!-- Annual Plan -->
           <label class="relative block group cursor-pointer">
             <input type="radio" name="plan" value="annual" class="peer hidden">
-            <div class="bg-white border-2 border-neutral-100 rounded-3xl p-6 transition-all duration-300 peer-checked:border-neutral-900 peer-checked:bg-neutral-50/50 group-hover:border-neutral-200 overflow-hidden ring-offset-2 peer-checked:ring-2 peer-checked:ring-neutral-900/10">
+            <div class="relative bg-white border-2 border-neutral-100 rounded-3xl p-6 transition-all duration-300 peer-checked:border-neutral-900 peer-checked:bg-neutral-50/50 group-hover:border-neutral-200 overflow-hidden ring-offset-2 peer-checked:ring-2 peer-checked:ring-neutral-900/10">
               <!-- Popular Badge -->
               <div class="absolute -right-12 top-6 rotate-45 bg-success text-white text-[10px] font-black py-1 w-44 text-center shadow-sm">MEILLEUR PRIX</div>
 
