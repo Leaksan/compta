@@ -1,5 +1,5 @@
 from datetime import timezone
-from app import app, db, User
+from api.index import app, db, User
 from werkzeug.security import generate_password_hash
 import datetime
 
