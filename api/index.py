@@ -31,7 +31,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 # ─── App Setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "compta-secret-key-change-in-prod")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///compta.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://neondb_owner:npg_viUgEYWc2JD5@ep-red-leaf-anz1mvq7-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
