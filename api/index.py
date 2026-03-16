@@ -1192,6 +1192,14 @@ def api_reset():
 
 
 # ─── User status API ──────────────────────────────────────────────────────────
+@app.route("/manifest.json")
+def serve_manifest():
+    return send_file("static/manifest.json")
+
+@app.route("/sw.js")
+def serve_sw():
+    return send_file("static/sw.js")
+
 @app.route("/api/user/me")
 @login_required
 def api_user_me():

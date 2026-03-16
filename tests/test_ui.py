@@ -16,7 +16,7 @@ def server():
     env["FLASK_ENV"] = "development"
     env["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test_ui.db"
 
-    proc = subprocess.Popen(["python", "app.py"], env=env)
+    proc = subprocess.Popen(["python", "api/index.py"], env=env)
 
     # Wait for server to start
     timeout = 10
