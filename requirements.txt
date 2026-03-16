@@ -4,6 +4,4 @@ flask-login==0.6.3
 werkzeug==3.0.4
 openpyxl==3.1.5
 python-dateutil==2.9.0
-pyscopg2-binary
-pyscopg
 psycopg2
