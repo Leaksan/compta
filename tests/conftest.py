@@ -1,6 +1,6 @@
 import pytest
 import os
-from app import app, db, User, Settings
+from api.index import app, db, User, Settings
 
 @pytest.fixture
 def client():
