@@ -1,3 +1,4 @@
+from datetime import timezone
 import os
 import uuid
 import json
@@ -85,7 +86,7 @@ class User(UserMixin, db.Model):
     is_pro = db.Column(db.Boolean, default=False)
     plan = db.Column(db.String(20), default="free")
     activated_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     transactions = db.relationship(
@@ -93,6 +94,9 @@ class User(UserMixin, db.Model):
     )
     settings = db.relationship(
         "Settings", backref="user", uselist=False, cascade="all, delete-orphan"
+    )
+    exports = db.relationship(
+        "Export", backref="user", lazy=True, cascade="all, delete-orphan"
     )
 
     def set_password(self, pw):
@@ -113,7 +117,7 @@ class Transaction(db.Model):
     category = db.Column(db.String(100), nullable=False)
     observation = db.Column(db.Text, default="")
     date = db.Column(db.Date, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     custom_data = db.Column(db.Text, default="{}")  # JSON
 
     def to_dict(self):
@@ -129,6 +133,18 @@ class Transaction(db.Model):
             "created_at": self.created_at.isoformat(),
             "custom_data": json.loads(self.custom_data or "{}"),
         }
+
+
+class Export(db.Model):
+    __tablename__ = "exports"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    month = db.Column(db.Integer, nullable=False)
+    end_year = db.Column(db.Integer, nullable=False)
+    end_month = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Settings(db.Model):
@@ -742,8 +758,9 @@ def history():
                 "count": len(txs),
             }
         )
+    exports = Export.query.filter_by(user_id=current_user.id).order_by(Export.created_at.desc()).all()
     return render_template(
-        "history.html", months=month_data, settings=settings, user=current_user
+        "history.html", months=month_data, exports=exports, settings=settings, user=current_user
     )
 
 
@@ -821,7 +838,7 @@ def api_activate_pro():
     if code == "PROTEST":
         current_user.is_pro = True
         current_user.plan = "pro"
-        current_user.activated_at = datetime.utcnow()
+        current_user.activated_at = datetime.now(timezone.utc)
         db.session.commit()
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Code promo invalide."})
@@ -941,91 +958,115 @@ def api_export():
 
     start = date(year, month, 1)
     end = date(end_year, end_month, calendar.monthrange(end_year, end_month)[1])
-    txs = get_transactions_for_period(current_user.id, start, end)
+
     settings = get_or_create_settings(current_user)
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Transactions"
-
-    MONTHS_FR = [
-        "janvier",
-        "février",
-        "mars",
-        "avril",
-        "mai",
-        "juin",
-        "juillet",
-        "août",
-        "septembre",
-        "octobre",
-        "novembre",
-        "décembre",
-    ]
-    start_str = f"{MONTHS_FR[start.month - 1]} {start.year}"
-    end_str = f"{MONTHS_FR[end.month - 1]} {end.year}"
-    period_label = start_str if start_str == end_str else f"Du {start_str} au {end_str}"
     labels = settings.field_labels
 
-    # Header row
-    headers = [
-        labels.get("date", "Date"),
-        labels.get("category", "Catégorie"),
-        labels.get("label", "Libellé"),
-        labels.get("observation", "Observation"),
-        labels.get("quantity", "Quantité"),
-        labels.get("income", "Entrée"),
-        labels.get("expense", "Dépense"),
-        "Solde cumulé",
+    MONTHS_FR = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre",
     ]
-    for i, h in enumerate(headers, 1):
-        c = ws.cell(row=1, column=i, value=h)
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = PatternFill(
-            start_color="171717", end_color="171717", fill_type="solid"
-        )
-        c.alignment = Alignment(horizontal="center")
 
-    running = 0
+    wb = openpyxl.Workbook()
+    # Remove default sheet
+    if wb.active:
+        wb.remove(wb.active)
+
+    # Calculate month ranges
+    month_ranges = []
+    curr = start
+    while curr <= end:
+        m_start = curr
+        m_end = date(curr.year, curr.month, calendar.monthrange(curr.year, curr.month)[1])
+        month_ranges.append((m_start, m_end))
+        curr += relativedelta(months=1)
+
     green = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
     red = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
-    for row, t in enumerate(sorted(txs, key=lambda x: x.date), 2):
-        running += t.amount if t.type == "income" else -t.amount
-        ws.cell(row=row, column=1, value=t.date.strftime("%d/%m/%Y"))
-        ws.cell(row=row, column=2, value=t.category)
-        ws.cell(row=row, column=3, value=t.label)
-        ws.cell(row=row, column=4, value=t.observation)
-        ws.cell(row=row, column=5, value=t.quantity)
-        inc_cell = ws.cell(
-            row=row, column=6, value=t.amount if t.type == "income" else 0
-        )
-        exp_cell = ws.cell(
-            row=row, column=7, value=t.amount if t.type == "expense" else 0
-        )
-        bal_cell = ws.cell(row=row, column=8, value=running)
-        inc_cell.fill = green if t.type == "income" else PatternFill()
-        exp_cell.fill = red if t.type == "expense" else PatternFill()
-        bal_cell.fill = green if running >= 0 else red
+    header_fill = PatternFill(start_color="171717", end_color="171717", fill_type="solid")
 
-    # Totals row
-    row = len(txs) + 2
-    ws.cell(row=row, column=1, value="TOTAL").font = Font(bold=True)
-    total_inc = sum(t.amount for t in txs if t.type == "income")
-    total_exp = sum(t.amount for t in txs if t.type == "expense")
-    c = ws.cell(row=row, column=6, value=total_inc)
-    c.font = Font(bold=True, color="059669")
-    c = ws.cell(row=row, column=7, value=total_exp)
-    c.font = Font(bold=True, color="DC2626")
+    for m_start, m_end in month_ranges:
+        sheet_title = f"{MONTHS_FR[m_start.month - 1]} {m_start.year}"
+        ws = wb.create_sheet(title=sheet_title)
 
-    # Auto-width
-    for col in ws.columns:
-        max_len = max((len(str(cell.value or "")) for cell in col), default=10)
-        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+        # Header row
+        headers = [
+            labels.get("date", "Date"),
+            labels.get("category", "Catégorie"),
+            labels.get("label", "Libellé"),
+            labels.get("observation", "Observation"),
+            labels.get("quantity", "Quantité"),
+            labels.get("income", "Entrée"),
+            labels.get("expense", "Dépense"),
+            "Solde cumulé",
+        ]
+        for i, h in enumerate(headers, 1):
+            c = ws.cell(row=1, column=i, value=h)
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = header_fill
+            c.alignment = Alignment(horizontal="center")
+
+        txs = get_transactions_for_period(current_user.id, m_start, m_end)
+        txs_sorted = sorted(txs, key=lambda x: x.date)
+
+        running = 0
+        for row_idx, t in enumerate(txs_sorted, 2):
+            running += t.amount if t.type == "income" else -t.amount
+            ws.cell(row=row_idx, column=1, value=t.date.strftime("%d/%m/%Y"))
+            ws.cell(row=row_idx, column=2, value=t.category)
+            ws.cell(row=row_idx, column=3, value=t.label)
+            ws.cell(row=row_idx, column=4, value=t.observation)
+            ws.cell(row=row_idx, column=5, value=t.quantity)
+
+            inc_val = t.amount if t.type == "income" else 0
+            exp_val = t.amount if t.type == "expense" else 0
+
+            inc_cell = ws.cell(row=row_idx, column=6, value=inc_val)
+            exp_cell = ws.cell(row=row_idx, column=7, value=exp_val)
+            bal_cell = ws.cell(row=row_idx, column=8, value=running)
+
+            if t.type == "income":
+                inc_cell.fill = green
+            elif t.type == "expense":
+                exp_cell.fill = red
+
+            bal_cell.fill = green if running >= 0 else red
+
+        # Totals row
+        total_row = len(txs_sorted) + 2
+        ws.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True)
+        total_inc = sum(t.amount for t in txs_sorted if t.type == "income")
+        total_exp = sum(t.amount for t in txs_sorted if t.type == "expense")
+
+        c_inc = ws.cell(row=total_row, column=6, value=total_inc)
+        c_inc.font = Font(bold=True, color="059669")
+        c_exp = ws.cell(row=total_row, column=7, value=total_exp)
+        c_exp.font = Font(bold=True, color="DC2626")
+
+        # Auto-width
+        for col in ws.columns:
+            max_len = max((len(str(cell.value or "")) for cell in col), default=10)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    filename = f"compta_{year}_{str(month).zfill(2)}.xlsx"
+
+    filename = f"rapport_du_{start.strftime('%d_%m_%Y')}_au_{end.strftime('%d_%m_%Y')}.xlsx"
+    # Record export in history
+    record_export = request.args.get("record", "true").lower() == "true"
+    if record_export:
+        new_export = Export(
+            user_id=current_user.id,
+            filename=filename,
+            year=year,
+            month=month,
+            end_year=end_year,
+            end_month=end_month
+        )
+        db.session.add(new_export)
+        db.session.commit()
+
     return send_file(
         buf,
         as_attachment=True,
@@ -1090,9 +1131,17 @@ def api_import():
 
                     tx_date = dp.parse(str(raw_date)).date()
                 except:
-                    tx_date = date.today()
+                    tx_date = date(
+                        request.args.get("year", date.today().year, type=int),
+                        request.args.get("month", date.today().month, type=int),
+                        1,
+                    )
             else:
-                tx_date = date.today()
+                tx_date = date(
+                    request.args.get("year", date.today().year, type=int),
+                    request.args.get("month", date.today().month, type=int),
+                    1,
+                )
             t = Transaction(
                 id=str(uuid.uuid4()),
                 user_id=current_user.id,
@@ -1225,7 +1274,7 @@ def api_admin_set_status():
     user.is_pro = is_pro
     if is_pro:
         user.plan = plan
-        user.activated_at = datetime.utcnow()
+        user.activated_at = datetime.now(timezone.utc)
     else:
         user.plan = "free"
     db.session.commit()

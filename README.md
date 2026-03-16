@@ -1,4 +1,4 @@
-# ComptaApp — Flask
+# kaizō — Flask
 
 Application de comptabilité simple pour entrepreneurs africains, réécrite en Python/Flask avec SQLite.
 
@@ -105,3 +105,24 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://...'  # PostgreSQL recomma
 - **openpyxl** — export/import Excel
 - **Tailwind CSS** (CDN) — styles
 - **Chart.js** (CDN) — graphiques
+
+---
+
+## 🧪 Tests
+
+L'application dispose d'une suite de tests complète (API et UI).
+
+### 1. Prérequis pour les tests
+Les tests d'interface utilisent **Playwright**. Ils seront installés automatiquement par le script.
+
+### 2. Lancer tous les tests
+Exécutez simplement le script à la racine :
+```bash
+./run_all_tests.sh
+```
+
+Ce script va :
+- Installer les dépendances nécessaires (`pytest`, `playwright`, etc.)
+- Installer les navigateurs pour Playwright
+- Lancer les tests API (`tests/test_api.py`)
+- Lancer les tests d'interface (`tests/test_ui.py`)

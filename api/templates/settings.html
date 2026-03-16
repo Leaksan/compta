@@ -61,23 +61,45 @@
     </div>
 
     <!-- Account status -->
-    <div class="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
-      <h2 class="text-xs font-semibold uppercase tracking-widest text-neutral-400 mb-6 flex items-center gap-2">
-        <svg class="w-4 h-4 {% if user.is_pro %}text-neutral-900{% else %}text-neutral-400{% endif %}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+    <div class="{% if user.is_pro %}bg-neutral-900 text-white{% else %}bg-white text-neutral-900{% endif %} p-6 rounded-3xl shadow-lg border border-neutral-100 overflow-hidden relative">
+      <h2 class="text-[10px] font-black uppercase tracking-[0.2em] {% if user.is_pro %}text-white/40{% else %}text-neutral-400{% endif %} mb-6 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
         Statut du compte
       </h2>
-       <div class="flex items-center justify-between">
-         <span class="text-sm font-medium text-neutral-900">Plan actuel</span>
-         <span class="px-4 py-1.5 rounded-full text-xs font-bold tracking-wide {% if user.is_pro %}bg-neutral-900 text-white{% else %}bg-neutral-100 text-neutral-500{% endif %}">
-           {% if user.is_pro %}PRO{% else %}GRATUIT{% endif %}
-         </span>
-       </div>
-       {% if user.is_pro %}
-       <div class="flex items-center justify-between mt-4">
-         <span class="text-sm font-medium text-neutral-900">Date de fin d'abonnement</span>
-         <span class="text-sm text-neutral-600">{{ end_date or 'N/A' }}</span>
-       </div>
-       {% endif %}
+
+      <div class="relative z-10 space-y-5">
+        <div class="flex items-center justify-between">
+          <div class="space-y-0.5">
+            <p class="text-[10px] uppercase font-bold {% if user.is_pro %}text-white/50{% else %}text-neutral-400{% endif %} tracking-wider">Plan actuel</p>
+            <p class="text-xl font-black">{% if user.is_pro %}PRO{% else %}GRATUIT{% endif %}</p>
+          </div>
+          {% if not user.is_pro %}
+          {% else %}
+          <div class="w-10 h-10 rounded-full bg-yellow-400/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if user.is_pro %}
+        <div class="pt-4 border-t border-white/10">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <div>
+              <p class="text-[10px] uppercase font-bold text-white/50 tracking-wider">Date de fin</p>
+              <p class="text-sm font-bold text-white">{{ end_date or 'Indéterminée' }}</p>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if user.is_pro %}
+      <!-- Decorative element -->
+      <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-2xl"></div>
+      {% endif %}
     </div>
 
     <!-- General settings -->
@@ -150,10 +172,6 @@
         Réinitialiser les données
       </button>
       <div class="mt-4 pt-4 border-t border-neutral-100">
-        <a href="/logout" class="w-full flex items-center justify-center gap-2 text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors py-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-          Se déconnecter
-        </a>
       </div>
     </div>
 

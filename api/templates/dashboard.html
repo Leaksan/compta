@@ -8,12 +8,8 @@
     <!-- Mobile logo/greeting -->
     <div class="md:hidden flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
-        <svg class="w-8 h-8 text-neutral-900" viewBox="0 0 32 32" fill="none">
-          <rect width="32" height="32" rx="8" fill="currentColor" fill-opacity="0.1"/>
-          <path d="M8 22V12l8-4 8 4v10l-8 4-8-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          <path d="M8 12l8 4 8-4M16 16v10" stroke="currentColor" stroke-width="1.5"/>
-        </svg>
-        <span class="text-xl font-bold text-neutral-900">ComptaApp</span>
+        <img src="/static/img/logo.jpg" class="w-8 h-8 rounded-lg shadow-sm" alt="kaizō">
+        <span class="text-xl font-bold text-neutral-900">kaizō</span>
       </div>
       <h2 class="text-sm font-medium text-neutral-500">{{ greeting }} 👋</h2>
     </div>
@@ -227,6 +223,8 @@
   const CHART_DATA = {{ chart_data | safe }};
   const CURRENT_YEAR = {{ year }};
   const CURRENT_MONTH = {{ month }};
+  const END_YEAR = {{ end_year }};
+  const END_MONTH = {{ end_month }};
   const IS_PRO = {{ 'true' if user.is_pro else 'false' }};
 
   // All transactions for JS (edit)
@@ -320,7 +318,14 @@
           <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.category || 'Catégorie'}</label>
           <select id="category" class="w-full bg-neutral-50 border border-neutral-100 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/10 appearance-none">${opts}</select></div>`;
       } else if (fid === 'date') {
-        const d = tx ? tx.date : new Date().toISOString().slice(0,10);
+        const now = new Date();
+        const todayIso = now.toLocaleDateString('en-CA');
+        const curToday = new Date(now.getFullYear(), now.getMonth(), 1);
+        const viewStart = new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 1);
+        const viewEnd = new Date(END_YEAR, END_MONTH - 1, 1);
+        const isTodayInPeriod = (curToday >= viewStart && curToday <= viewEnd);
+        const defaultDate = isTodayInPeriod ? todayIso : `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2, '0')}-01`;
+        const d = tx ? tx.date : defaultDate;
         html += `<div>
           <label class="block text-[10px] font-semibold uppercase tracking-widest text-neutral-400 mb-2">${fl.date || 'Date'}</label>
           <input type="date" id="txDate" required value="${d}"
@@ -344,6 +349,17 @@
       }
     }
 
+    if (hidden.includes('date')) {
+      const now = new Date();
+      const todayIso = now.toLocaleDateString('en-CA');
+      const curToday = new Date(now.getFullYear(), now.getMonth(), 1);
+      const viewStart = new Date(CURRENT_YEAR, CURRENT_MONTH - 1, 1);
+      const viewEnd = new Date(END_YEAR, END_MONTH - 1, 1);
+      const isTodayInPeriod = (curToday >= viewStart && curToday <= viewEnd);
+      const defaultDate = isTodayInPeriod ? todayIso : `${CURRENT_YEAR}-${String(CURRENT_MONTH).padStart(2, '0')}-01`;
+      const d = tx ? tx.date : defaultDate;
+      html += `<input type="hidden" id="txDate" value="${d}">`;
+    }
     html += `<button type="submit" class="w-full bg-neutral-900 text-white font-semibold py-4 rounded-xl mt-8 hover:bg-neutral-800 transition-colors active:scale-95">Enregistrer</button></form>`;
     return html;
   }
@@ -395,7 +411,7 @@
     const label = document.getElementById('label')?.value || '';
     const obs = document.getElementById('observation')?.value || '';
     const qty = parseInt(document.getElementById('quantity')?.value || '1');
-    const txDate = document.getElementById('txDate').value;
+    const txDate = document.getElementById('txDate')?.value || '';
     const customData = {};
     for (const cf of (SETTINGS.custom_fields || [])) {
       const el = document.getElementById(`cf_${cf.id}`);
@@ -444,7 +460,7 @@
     showConfirm('Importer des données', "L'importation va ajouter les transactions du fichier. Voulez-vous continuer ?", async () => {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch('/api/import', { method: 'POST', body: fd });
+      const res = await fetch(`/api/import?year=${CURRENT_YEAR}&month=${CURRENT_MONTH}`, { method: 'POST', body: fd });
       const data = await res.json();
       showAlert(data.success ? 'Succès' : 'Erreur', data.message || data.error || 'Terminé');
       if (data.success) setTimeout(() => window.location.reload(), 800);
