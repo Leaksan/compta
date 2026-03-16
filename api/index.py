@@ -979,6 +979,33 @@ def api_export():
     settings = get_or_create_settings(current_user)
     labels = settings.field_labels
     custom_fields = settings.custom_fields
+    field_order = settings.field_order
+    hidden_fields = settings.hidden_fields
+
+    # Build ordered list of visible columns: (field_id, display_name)
+    STANDARD_LABELS = {
+        "date":        labels.get("date", "Date"),
+        "category":    labels.get("category", "Catégorie"),
+        "label":       labels.get("label", "Libellé"),
+        "observation": labels.get("observation", "Observation"),
+        "quantity":    labels.get("quantity", "Quantité"),
+        "income":      labels.get("income", "Entrée"),
+        "expense":     labels.get("expense", "Dépense"),
+    }
+    custom_fields_map = {cf["id"]: cf for cf in custom_fields}
+
+    # Visible columns = field_order minus hidden_fields (same logic as the form)
+    visible_fields = [f for f in field_order if f not in hidden_fields]
+
+    # Build (id, header_name) list; skip unknown ids
+    col_defs = []
+    for fid in visible_fields:
+        if fid in STANDARD_LABELS:
+            col_defs.append((fid, STANDARD_LABELS[fid]))
+        elif fid in custom_fields_map:
+            col_defs.append((fid, custom_fields_map[fid]["name"]))
+    # Always append cumulative balance at the end
+    col_defs.append(("balance", "Solde cumulé"))
 
     MONTHS_FR = [
         "janvier", "février", "mars", "avril", "mai", "juin",
@@ -1007,23 +1034,9 @@ def api_export():
         sheet_title = f"{MONTHS_FR[m_start.month - 1]} {m_start.year}"
         ws = wb.create_sheet(title=sheet_title)
 
-        # Header row
-        headers = [
-            labels.get("date", "Date"),
-            labels.get("category", "Catégorie"),
-            labels.get("label", "Libellé"),
-            labels.get("observation", "Observation"),
-            labels.get("quantity", "Quantité"),
-        ]
-        for cf in custom_fields:
-            headers.append(cf["name"])
-        headers.extend([
-            labels.get("income", "Entrée"),
-            labels.get("expense", "Dépense"),
-            "Solde cumulé",
-        ])
-        for i, h in enumerate(headers, 1):
-            c = ws.cell(row=1, column=i, value=h)
+        # Header row — dynamic, follows visible field order
+        for col_i, (fid, hname) in enumerate(col_defs, 1):
+            c = ws.cell(row=1, column=col_i, value=hname)
             c.font = Font(bold=True, color="FFFFFF")
             c.fill = header_fill
             c.alignment = Alignment(horizontal="center")
@@ -1032,33 +1045,45 @@ def api_export():
         txs_sorted = sorted(txs, key=lambda x: x.date)
 
         running = 0
+        income_col_idx = None
+        expense_col_idx = None
         for row_idx, t in enumerate(txs_sorted, 2):
             running += t.amount if t.type == "income" else -t.amount
-            ws.cell(row=row_idx, column=1, value=t.date.strftime("%d/%m/%Y"))
-            ws.cell(row=row_idx, column=2, value=t.category)
-            ws.cell(row=row_idx, column=3, value=t.label)
-            ws.cell(row=row_idx, column=4, value=t.observation)
-            ws.cell(row=row_idx, column=5, value=t.quantity)
-
-            curr_col = 6
             t_custom = json.loads(t.custom_data or "{}")
-            for cf in custom_fields:
-                ws.cell(row=row_idx, column=curr_col, value=t_custom.get(cf["id"], ""))
-                curr_col += 1
 
-            inc_val = t.amount if t.type == "income" else 0
-            exp_val = t.amount if t.type == "expense" else 0
+            for col_i, (fid, _) in enumerate(col_defs, 1):
+                val = None
+                cell_fill = None
 
-            inc_cell = ws.cell(row=row_idx, column=curr_col, value=inc_val)
-            exp_cell = ws.cell(row=row_idx, column=curr_col + 1, value=exp_val)
-            bal_cell = ws.cell(row=row_idx, column=curr_col + 2, value=running)
+                if fid == "date":
+                    val = t.date.strftime("%d/%m/%Y")
+                elif fid == "category":
+                    val = t.category
+                elif fid == "label":
+                    val = t.label
+                elif fid == "observation":
+                    val = t.observation
+                elif fid == "quantity":
+                    val = t.quantity
+                elif fid == "income":
+                    val = t.amount if t.type == "income" else 0
+                    if t.type == "income":
+                        cell_fill = green
+                    income_col_idx = col_i
+                elif fid == "expense":
+                    val = t.amount if t.type == "expense" else 0
+                    if t.type == "expense":
+                        cell_fill = red
+                    expense_col_idx = col_i
+                elif fid == "balance":
+                    val = running
+                    cell_fill = green if running >= 0 else red
+                elif fid in custom_fields_map:
+                    val = t_custom.get(fid, "")
 
-            if t.type == "income":
-                inc_cell.fill = green
-            elif t.type == "expense":
-                exp_cell.fill = red
-
-            bal_cell.fill = green if running >= 0 else red
+                cell = ws.cell(row=row_idx, column=col_i, value=val)
+                if cell_fill:
+                    cell.fill = cell_fill
 
         # Totals row
         total_row = len(txs_sorted) + 2
@@ -1066,12 +1091,12 @@ def api_export():
         total_inc = sum(t.amount for t in txs_sorted if t.type == "income")
         total_exp = sum(t.amount for t in txs_sorted if t.type == "expense")
 
-        income_col = 6 + len(custom_fields)
-        expense_col = income_col + 1
-        c_inc = ws.cell(row=total_row, column=income_col, value=total_inc)
-        c_inc.font = Font(bold=True, color="059669")
-        c_exp = ws.cell(row=total_row, column=expense_col, value=total_exp)
-        c_exp.font = Font(bold=True, color="DC2626")
+        if income_col_idx:
+            c_inc = ws.cell(row=total_row, column=income_col_idx, value=total_inc)
+            c_inc.font = Font(bold=True, color="059669")
+        if expense_col_idx:
+            c_exp = ws.cell(row=total_row, column=expense_col_idx, value=total_exp)
+            c_exp.font = Font(bold=True, color="DC2626")
 
         # Auto-width
         for col in ws.columns:
