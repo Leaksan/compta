@@ -171,7 +171,7 @@ async function setStatus(userId, isPro) {
   const r = await fetch('/api/admin/users/set-status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, isPro, plan }),
+    body: JSON.stringify({ userId, isPro, plan, auth_key: KEY }),
   });
   if (r.ok) {
     toast(isPro ? '✓ Passé en PRO' : '✓ Passé en FREE');
@@ -188,7 +188,7 @@ async function saveSettings() {
   const r = await fetch('/api/admin/settings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ whatsapp_number: waNumber, admin_key: adminKey }),
+    body: JSON.stringify({ whatsapp_number: waNumber, admin_key: adminKey, auth_key: KEY }),
   });
   if (r.ok) toast('✓ Paramètres sauvegardés');
   else      toast('❌ Erreur');
