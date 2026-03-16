@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CheckMode — Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body   { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e5e5e5; min-height: 100vh; }
+    /* ── Topbar ── */
+    .topbar { background: #111; border-bottom: 1px solid #1e1e1e; padding: 16px 28px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+    .topbar h1 { font-size: 18px; font-weight: 700; }
+    .topbar .tag { font-size: 12px; color: #444; background: #1a1a1a; padding: 4px 12px; border-radius: 99px; }
+    /* ── Stats ── */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; padding: 24px 28px; }
+    .stat { background: #111; border: 1px solid #1e1e1e; border-radius: 14px; padding: 20px; }
+    .stat .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: #555; margin-bottom: 6px; }
+    .stat .val { font-size: 30px; font-weight: 800; }
+    /* ── Sections ── */
+    .section { padding: 0 28px 28px; }
+    .section h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: #555; margin-bottom: 14px; padding-top: 4px; }
+    .overflow { overflow-x: auto; border-radius: 14px; border: 1px solid #1e1e1e; }
+    /* ── Table ── */
+    table  { width: 100%; border-collapse: collapse; background: #111; font-size: 13px; }
+    th     { background: #141414; padding: 11px 14px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #555; white-space: nowrap; }
+    td     { padding: 11px 14px; border-bottom: 1px solid #1a1a1a; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #131313; }
+    /* ── Badges ── */
+    .badge { padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+    .badge.pro  { background: #16a34a22; color: #4ade80; border: 1px solid #16a34a44; }
+    .badge.free { background: #33333355; color: #888;    border: 1px solid #2a2a2a; }
+    /* ── Buttons ── */
+    .btn { padding: 5px 12px; border: none; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 700; transition: .15s; }
+    .btn-green  { background: #16a34a; color: white; } .btn-green:hover  { background: #15803d; }
+    .btn-red    { background: #dc2626; color: white; } .btn-red:hover    { background: #b91c1c; }
+    .plan-sel   { padding: 5px 8px; background: #1a1a1a; border: 1px solid #333; border-radius: 7px; color: #e5e5e5; font-size: 12px; cursor: pointer; }
+    /* ── Settings box ── */
+    .settings-box { background: #111; border: 1px solid #1e1e1e; border-radius: 14px; padding: 24px; max-width: 560px; }
+    .form-row { margin-bottom: 16px; }
+    .form-row label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: #555; margin-bottom: 7px; }
+    .form-row input  { width: 100%; padding: 11px 14px; background: #1a1a1a; border: 1px solid #333; border-radius: 9px; color: white; font-size: 14px; outline: none; }
+    .form-row input:focus { border-color: #555; }
+    .save-btn { padding: 11px 24px; background: white; color: #0a0a0a; border: none; border-radius: 9px; font-weight: 700; font-size: 14px; cursor: pointer; transition: .15s; }
+    .save-btn:hover { background: #e5e5e5; }
+    /* ── Toast ── */
+    .toast { position: fixed; top: 20px; right: 20px; background: #16a34a; color: white; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; display: none; z-index: 999; box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+    .divider { height: 1px; background: #1a1a1a; margin: 0 28px 28px; }
+  </style>
+</head>
+<body>
+
+<div id="toast" class="toast">✓ Effectué</div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <h1>🔐 CheckMode <span style="font-size:14px;color:#666;font-weight:400;margin-left:8px">Panneau Administrateur</span></h1>
+  <span class="tag">compta-app</span>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat"><div class="lbl">Total utilisateurs</div><div class="val">{{ users|length }}</div></div>
+  <div class="stat"><div class="lbl">Abonnés PRO</div><div class="val" style="color:#4ade80">{{ pro_count }}</div></div>
+  <div class="stat"><div class="lbl">Plan Free</div><div class="val" style="color:#f59e0b">{{ free_count }}</div></div>
+  <div class="stat">
+    <div class="lbl">Revenu mensuel estimé</div>
+    <div class="val" style="color:#60a5fa">
+      {{ "{:,}".format(pro_count * 10000).replace(',', ' ') }}
+      <span style="font-size:14px;font-weight:400;color:#555"> FCFA</span>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau utilisateurs -->
+<div class="section">
+  <h2>Tous les utilisateurs</h2>
+  <div class="overflow">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Prénom</th><th>Entreprise</th><th>WhatsApp</th>
+          <th>Email</th><th>Statut</th><th>Plan</th><th>Activé</th><th>Inscrit</th><th>Expire le</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if users %}
+          {% for u in users %}
+          <tr>
+            <td>{{ u['id'] }}</td>
+            <td>{{ u['first_name'] or '—' }}</td>
+            <td>{{ u['company_name'] or '—' }}</td>
+            <td>
+              <a href="https://wa.me/{{ u['whatsapp'] | replace('+','') | replace(' ','') }}" target="_blank" style="color:#25d366">
+                {{ u['whatsapp'] }}
+              </a>
+            </td>
+            <td>{{ u['email'] or '—' }}</td>
+            <td>
+              <span class="badge {{ 'pro' if u['is_pro'] else 'free' }}">
+                {{ '✓ PRO' if u['is_pro'] else 'FREE' }}
+              </span>
+            </td>
+            <td>
+              {% set plan_colors = {'monthly':'#3b82f6','quarterly':'#8b5cf6','yearly':'#f59e0b','annual':'#f59e0b','free':'#444'} %}
+              {% set plan_labels = {'monthly':'Mensuel','quarterly':'Trimestriel','yearly':'Annuel','annual':'Annuel','free':'Free'} %}
+              {% set plan = u['plan'] or 'free' %}
+              <span style="background:{{ plan_colors.get(plan,'#444') }};color:white;padding:2px 8px;border-radius:99px;font-size:11px">
+                {{ plan_labels.get(plan, plan) }}
+              </span>
+            </td>
+            <td>{{ u['activated_at'].strftime('%Y-%m-%d') if u['activated_at'] else '—' }}</td>
+            <td>{{ u['created_at'].strftime('%Y-%m-%d') if u['created_at'] else '—' }}</td>
+            <td>{{ u['end_date'] or '—' }}</td>
+            <td>
+              <div style="display:flex;gap:6px;align-items:center">
+                {% if not u['is_pro'] %}
+                  <button class="btn btn-green" onclick="setStatus({{ u['id'] }}, true)">→ PRO</button>
+                {% else %}
+                  <button class="btn btn-red"   onclick="setStatus({{ u['id'] }}, false)">→ FREE</button>
+                {% endif %}
+                <select id="plan_{{ u['id'] }}" class="plan-sel">
+                  <option value="monthly"   {{ 'selected' if u['plan'] == 'monthly' }}>Mensuel</option>
+                  <option value="quarterly" {{ 'selected' if u['plan'] == 'quarterly' }}>Trimestriel</option>
+                  <option value="annual"    {{ 'selected' if u['plan'] in ('yearly', 'annual') }}>Annuel</option>
+                  <option value="free"      {{ 'selected' if u['plan'] == 'free' or not u['plan'] }}>Free</option>
+                </select>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="11" style="text-align:center;padding:32px;color:#444">Aucun utilisateur inscrit</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- Paramètres -->
+<div class="section">
+  <h2>Paramètres</h2>
+  <div class="settings-box">
+    <div class="form-row">
+      <label>Numéro WhatsApp de paiement <span style="color:#444;text-transform:none;letter-spacing:0">(sans le +, ex: 24101234567)</span></label>
+      <input type="text" id="waNumber" value="{{ settings.get('whatsapp_number','') }}" placeholder="24101234567"/>
+    </div>
+    <div class="form-row">
+      <label>Clé d'accès admin <span style="color:#444;text-transform:none;letter-spacing:0">(utilisée dans /checkmode?key=XXX)</span></label>
+      <input type="text" id="adminKey" value="{{ settings.get('admin_key','') }}"/>
+    </div>
+    <button class="save-btn" onclick="saveSettings()">💾 Sauvegarder les paramètres</button>
+  </div>
+</div>
+
+<script>
+const KEY = {{ admin_key | tojson }};
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+async function setStatus(userId, isPro) {
+  const sel  = document.getElementById('plan_' + userId);
+  const plan = sel ? sel.value : (isPro ? 'monthly' : 'free');
+  const r = await fetch('/api/admin/users/set-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, isPro, plan }),
+  });
+  if (r.ok) {
+    toast(isPro ? '✓ Passé en PRO' : '✓ Passé en FREE');
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    toast('❌ Erreur');
+  }
+}
+
+async function saveSettings() {
+  const waNumber = document.getElementById('waNumber').value.trim();
+  const adminKey = document.getElementById('adminKey').value.trim();
+  if (!waNumber || !adminKey) { toast('❌ Champs requis'); return; }
+  const r = await fetch('/api/admin/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ whatsapp_number: waNumber, admin_key: adminKey }),
+  });
+  if (r.ok) toast('✓ Paramètres sauvegardés');
+  else      toast('❌ Erreur');
+}
+</script>
+</body>
+</html>
