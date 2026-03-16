@@ -1,3 +1,4 @@
+import re
 from datetime import timezone
 import os
 import uuid
@@ -1061,7 +1062,8 @@ def api_export():
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"rapport_du_{start.strftime('%d_%m_%Y')}_au_{end.strftime('%d_%m_%Y')}.xlsx"
+    comp_name = re.sub(r'[^a-zA-Z0-9]', '_', current_user.company_name or 'Export')
+    filename = f"{comp_name}_du{start.strftime('%d_%m')}_au_{end.strftime('%d_%m')}.xlsx"
     # Record export in history
     record_export = request.args.get("record", "true").lower() == "true"
     if record_export:
