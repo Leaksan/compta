@@ -14,6 +14,7 @@ from flask import (
     url_for,
     jsonify,
     send_file,
+    abort
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -31,7 +32,10 @@ from openpyxl.styles import Font, PatternFill, Alignment
 # ─── App Setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "compta-secret-key-change-in-prod")
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://neondb_owner:npg_viUgEYWc2JD5@ep-red-leaf-anz1mvq7-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://neondb_owner:npg_viUgEYWc2JD5@ep-red-leaf-anz1mvq7-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -854,7 +858,12 @@ def api_subscribe_pro():
     plan_names = {"monthly": "Mensuel", "quarterly": "Trimestriel", "annual": "Annuel"}
     message = f"Bonjour, je souhaite m'abonner au plan PRO {plan_names[plan]}. Nom: {current_user.first_name or ''}, Entreprise: {current_user.company_name or ''}, WhatsApp: {current_user.whatsapp or ''}, Email: {current_user.email or ''}"
     encoded_message = urllib.parse.quote(message)
-    whatsapp_url = f"https://wa.me/+24177000000?text={encoded_message}"
+
+    gs = GlobalSettings.query.first()
+    wa_number = gs.whatsapp_number if gs and gs.whatsapp_number else "24177000000"
+    if not wa_number.startswith("+"):
+        wa_number = "+" + wa_number
+    whatsapp_url = f"https://wa.me/{wa_number}?text={encoded_message}"
     return jsonify({"success": True, "whatsapp_url": whatsapp_url})
 
 
@@ -1227,6 +1236,11 @@ def checkmode():
         db.session.add(gs)
         db.session.commit()
 
+    # Simple security check
+    key = request.args.get("key")
+    if gs.admin_key and key != gs.admin_key:
+        abort(403)
+
     users = []
     for u in User.query.all():
         user_dict = {
@@ -1273,6 +1287,12 @@ def api_admin_set_status():
         db.session.add(gs)
         db.session.commit()
     data = request.get_json()
+
+    # Security check
+    auth_key = data.get("auth_key")
+    if gs.admin_key and auth_key != gs.admin_key:
+        abort(403)
+
     user_id = data.get("userId")
     is_pro = data.get("isPro")
     plan = data.get("plan")
@@ -1297,6 +1317,12 @@ def api_admin_settings():
         db.session.add(gs)
         db.session.commit()
     data = request.get_json()
+
+    # Security check
+    auth_key = data.get("auth_key")
+    if gs.admin_key and auth_key != gs.admin_key:
+        abort(403)
+
     gs.whatsapp_number = data.get("whatsapp_number", gs.whatsapp_number)
     gs.admin_key = data.get("admin_key", gs.admin_key)
     db.session.commit()
