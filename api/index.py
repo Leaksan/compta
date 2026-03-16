@@ -1107,6 +1107,55 @@ def api_export():
 
 
 # ─── Import Excel ─────────────────────────────────────────────────────────────
+
+def _parse_amount(val):
+    """Parse a cell value as a float, handling French formats (1 500,00) and plain numbers."""
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip()
+    if not s:
+        return 0.0
+    # Remove thousand separators: spaces and non-breaking spaces
+    s = s.replace("\u00a0", "").replace(" ", "")
+    # Replace French decimal comma with dot
+    s = s.replace(",", ".")
+    # Remove any currency symbols or extra chars, keep digits, dot, minus
+    s = re.sub(r"[^\d.\-]", "", s)
+    if not s or s in (".", "-"):
+        return 0.0
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+def _parse_date(raw, fallback_year, fallback_month):
+    """Parse a date from an Excel cell, always interpreting DD/MM/YYYY (day-first)."""
+    if raw is None:
+        return date(fallback_year, fallback_month, 1)
+    if isinstance(raw, datetime):
+        return raw.date()
+    if isinstance(raw, date):
+        return raw
+    s = str(raw).strip()
+    if not s:
+        return date(fallback_year, fallback_month, 1)
+    # Try explicit formats first (most common in French exports)
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y", "%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    # Fallback: dateutil with dayfirst=True so 05/06/2024 → June 5, not May 6
+    try:
+        from dateutil import parser as dp
+        return dp.parse(s, dayfirst=True).date()
+    except Exception:
+        return date(fallback_year, fallback_month, 1)
+
+
 @app.route("/api/import", methods=["POST"])
 @login_required
 def api_import():
@@ -1119,102 +1168,144 @@ def api_import():
     labels = settings.field_labels
     custom_fields = settings.custom_fields
 
-    try:
+    fallback_year = request.args.get("year", date.today().year, type=int)
+    fallback_month = request.args.get("month", date.today().month, type=int)
 
-        wb = openpyxl.load_workbook(f, data_only=True)
+    try:
+        # Bug fix #3: Read the file stream into bytes to avoid stream exhaustion issues
+        file_bytes = io.BytesIO(f.read())
+        wb = openpyxl.load_workbook(file_bytes, data_only=True, read_only=True)
         added = 0
-        custom_fields = settings.custom_fields
+        skipped = 0
+
+        # Build label map once (same for all sheets)
+        label_map = {normalize_header(v): k for k, v in labels.items()}
+        label_map.update({
+            "date": "date",
+            "categorie": "category",
+            "libelle": "label",
+            "observation": "observation",
+            "quantite": "quantity",
+            "entree": "income",
+            # aliases for income
+            "recette": "income",
+            "credit": "income",
+            "credits": "income",
+            "montant entree": "income",
+            "depense": "expense",
+            # aliases for expense
+            "debit": "expense",
+            "debits": "expense",
+            "charge": "expense",
+            "montant depense": "expense",
+            "solde cumule": "balance",
+            "solde": "balance",
+            "montant": "income",   # generic "montant" → treated as income if positive
+        })
+        for cf in custom_fields:
+            label_map[normalize_header(cf["name"])] = cf["id"]
+
+        BATCH_SIZE = 50  # Bug fix #4: commit in batches to avoid DB timeouts
 
         for ws in wb.worksheets:
-            headers = [normalize_header(c.value) for c in ws[1]]
-            if not any(headers): continue
-
-            # Build label map from settings + defaults
-            label_map = {normalize_header(v): k for k, v in labels.items()}
-            label_map.update({
-                "date": "date",
-                "categorie": "category",
-                "libelle": "label",
-                "observation": "observation",
-                "quantite": "quantity",
-                "entree": "income",
-                "depense": "expense",
-                "solde cumule": "balance",
-            })
-            # Add custom fields to label map
-            for cf in custom_fields:
-                label_map[normalize_header(cf["name"])] = cf["id"]
+            # Read headers from first row
+            first_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+            if not first_row or not any(first_row):
+                continue
+            headers = [normalize_header(c) for c in first_row]
 
             col_map = {}
             for i, h in enumerate(headers):
-                if h in label_map:
+                if h and h in label_map:
                     col_map[label_map[h]] = i
 
+            # Need at least a date column and one of income/expense/montant
+            if "date" not in col_map and "income" not in col_map and "expense" not in col_map:
+                continue
+
             for row in ws.iter_rows(min_row=2, values_only=True):
-                if not any(row): continue
+                if not any(cell for cell in row if cell is not None):
+                    continue
 
-                # Skip TOTAL rows
-                first_val = normalize_header(row[0]) if row and row[0] else ""
-                if first_val == "total": continue
+                # Skip summary/total rows
+                first_val = normalize_header(row[0]) if row and row[0] is not None else ""
+                if first_val in ("total", "totaux", "sous-total", "sous total"):
+                    continue
 
-                inc = 0
-                if "income" in col_map:
-                    try: inc = float(row[col_map["income"]] or 0)
-                    except: inc = 0
+                # Bug fix #2: robust amount parsing for French-formatted numbers
+                inc = _parse_amount(row[col_map["income"]]) if "income" in col_map else 0.0
+                exp = _parse_amount(row[col_map["expense"]]) if "expense" in col_map else 0.0
 
-                exp = 0
-                if "expense" in col_map:
-                    try: exp = float(row[col_map["expense"]] or 0)
-                    except: exp = 0
+                # Handle files with a single "montant" column: positive = income, negative = expense
+                if inc == 0 and exp == 0 and "montant" in col_map:
+                    m = _parse_amount(row[col_map["montant"]])
+                    if m > 0:
+                        inc = m
+                    elif m < 0:
+                        exp = abs(m)
 
-                if inc == 0 and exp == 0: continue
+                if inc == 0 and exp == 0:
+                    skipped += 1
+                    continue
 
                 tx_type = "income" if inc > 0 else "expense"
                 amount = inc if tx_type == "income" else exp
 
+                # Bug fix #1: date parsing always uses day-first to match DD/MM/YYYY export format
                 raw_date = row[col_map["date"]] if "date" in col_map else None
-                if isinstance(raw_date, datetime):
-                    tx_date = raw_date.date()
-                elif isinstance(raw_date, date):
-                    tx_date = raw_date
-                elif raw_date:
-                    try:
-                        from dateutil import parser as dp
-                        tx_date = dp.parse(str(raw_date)).date()
-                    except:
-                        tx_date = date(request.args.get("year", date.today().year, type=int),
-                                     request.args.get("month", date.today().month, type=int), 1)
-                else:
-                    tx_date = date(request.args.get("year", date.today().year, type=int),
-                                 request.args.get("month", date.today().month, type=int), 1)
+                tx_date = _parse_date(raw_date, fallback_year, fallback_month)
 
                 # Extract custom data
                 row_custom_data = {}
                 for cf in custom_fields:
                     if cf["id"] in col_map:
-                        row_custom_data[cf["id"]] = row[col_map[cf["id"]]]
+                        cell_val = row[col_map[cf["id"]]]
+                        row_custom_data[cf["id"]] = str(cell_val) if cell_val is not None else ""
+
+                # Safe extraction helpers
+                def _cell_str(key, default=""):
+                    if key not in col_map:
+                        return default
+                    v = row[col_map[key]]
+                    return str(v).strip() if v is not None else default
+
+                def _cell_int(key, default=1):
+                    if key not in col_map:
+                        return default
+                    try:
+                        v = row[col_map[key]]
+                        return int(v) if v is not None else default
+                    except (ValueError, TypeError):
+                        return default
 
                 t = Transaction(
                     id=str(uuid.uuid4()),
                     user_id=current_user.id,
                     type=tx_type,
                     amount=amount,
-                    quantity=int(row[col_map["quantity"]] or 1) if "quantity" in col_map else 1,
-                    label=str(row[col_map["label"]] or "") if "label" in col_map else "",
-                    category=str(row[col_map["category"]] or "Import") if "category" in col_map else "Import",
-                    observation=str(row[col_map["observation"]] or "") if "observation" in col_map else "",
+                    quantity=_cell_int("quantity", 1),
+                    label=_cell_str("label", ""),
+                    category=_cell_str("category", "Import"),
+                    observation=_cell_str("observation", ""),
                     date=tx_date,
                     custom_data=json.dumps(row_custom_data)
                 )
                 db.session.add(t)
                 added += 1
+
+                # Bug fix #4: commit in batches to avoid timeouts on large files
+                if added % BATCH_SIZE == 0:
+                    db.session.commit()
+
+        # Final commit for remaining rows
         db.session.commit()
-        return jsonify(
-            {
-                "success": True,
-                "message": f"{added} transaction(s) importée(s) avec succès.",
-            }
-        )
+        wb.close()
+
+        msg = f"{added} transaction(s) importée(s) avec succès."
+        if skipped > 0:
+            msg += f" ({skipped} ligne(s) ignorée(s) car montant vide ou nul.)"
+        return jsonify({"success": True, "message": msg})
+
     except Exception as e:
         db.session.rollback()
         return jsonify(
